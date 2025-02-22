@@ -1,0 +1,83 @@
+{
+    "// Training Parameters": null,
+    "num_epochs": 200,
+    "batch_size": 8,
+    "learning_rate": 0.0002,
+    "beta1": 0.5,
+    "beta2": 0.999,
+    "weight_decay": 1e-4,
+    "gradient_clip": 1.0,
+
+    "// Loss Weights": null,
+    "lambda_pixel": 100.0,
+    "lambda_perceptual": 10.0,
+    "lambda_ssim": 5.0,
+    "lambda_adv": 1.0,
+
+    "// Data Parameters": null,
+    "data": {
+        "train_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/DummyData",
+        "val_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/DummyData",
+        "test_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/DummyData",
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "target_size": 500,
+        "random_seed": 42
+    },
+
+    "// Checkpointing": null,
+    "save_interval": 10,
+    "validate_interval": 5,
+    "checkpoint_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/DummyData/Checkpoints",
+    "results_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/DummyData/Results",
+
+    "// Learning Rate Scheduling": null,
+    "lr_scheduler": {
+        "lr_decay_start": 100,
+        "lr_decay_factor": 0.1,
+        "lr_decay_interval": 50
+    },
+
+    "// Model Architecture": null,
+    "model": {
+        "spectral_channels": 31,
+        "generator": {
+            "initial_filters": 32,
+            "max_filters": 128
+        },
+        "discriminator": {
+            "initial_filters": 64,
+            "max_filters": 512
+        }
+    },
+
+    "// Augmentation Settings": null,
+    "augmentation": {
+        "enabled": true,
+        "horizontal_flip_prob": 0.5,
+        "vertical_flip_prob": 0.5,
+        "rotation_degrees": 10,
+        "translate_ratio": 0.1
+    },
+
+    "// Logging": null,
+    "logging": {
+        "print_interval": 100,
+        "tensorboard_dir": "/path/to/tensorboard/logs",
+        "save_images_interval": 500
+    },
+
+    "// Hardware Settings": null,
+    "hardware": {
+        "num_workers": 4,
+        "pin_memory": true,
+        "cuda_device": 0
+    },
+
+    "// Early Stopping": null,
+    "early_stopping": {
+        "enabled": true,
+        "patience": 20,
+        "min_delta": 0.001
+    }
+}
