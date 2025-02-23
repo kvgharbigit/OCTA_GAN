@@ -469,21 +469,21 @@ def init_weights(model: nn.Module) -> None:
         init.constant_(model.bias.data, 0.0)
 
 
-def get_scheduler(optimizer: torch.optim.Optimizer, config: TrainingConfig) -> torch.optim.lr_scheduler._LRScheduler:
+def get_scheduler(optimizer: torch.optim.Optimizer, config: dict) -> torch.optim.lr_scheduler._LRScheduler:
     """
     Create learning rate scheduler for training.
 
     Args:
         optimizer (torch.optim.Optimizer): Optimizer to schedule
-        config (TrainingConfig): Training configuration
+        config (dict): Training configuration dictionary
 
     Returns:
         torch.optim.lr_scheduler._LRScheduler: Learning rate scheduler
     """
     return torch.optim.lr_scheduler.StepLR(
         optimizer,
-        step_size=config.lr_decay_interval,
-        gamma=config.lr_decay_factor,
+        step_size=config['lr_scheduler']['lr_decay_interval'],
+        gamma=config['lr_scheduler']['lr_decay_factor'],
         last_epoch=-1
     )
 
