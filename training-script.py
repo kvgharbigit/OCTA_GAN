@@ -9,15 +9,16 @@ from tqdm import tqdm
 from datetime import datetime
 import os
 import json
-import argparse  # Add this import
+import argparse
 
 from base import (
-    HSI_OCTA_Dataset, Generator, Discriminator,
-    PerceptualLoss, SSIMLoss, TrainingConfig,
+    Generator, Discriminator,
+    PerceptualLoss, SSIMLoss,
     init_weights, get_scheduler, save_checkpoint
 )
+from hsi_octa_dataset_cropped import HSI_OCTA_Dataset_Cropped
 from config_utils import load_config, setup_directories, validate_directories
-from visualization_utils import save_sample_visualizations  # New import
+from visualization_utils import save_sample_visualizations
 
 
 # Custom JSON encoder to handle Path objects
@@ -29,9 +30,18 @@ class PathEncoder(json.JSONEncoder):
 
 
 class Trainer:
-    def __init__(self, config_path: str, exp_id: str = None):
+    def __init__(self, config_path: str, exp_id: str = None, use_circle_crop: bool = True):
         # Load and validate configuration
         self.config = load_config(config_path)
+
+        # Set option for circle cropping
+        self.use_circle_crop = use_circle_crop
+
+        # Update config with circle crop option
+        if 'preprocessing' not in self.config:
+            self.config['preprocessing'] = {}
+        self.config['preprocessing']['circle_crop'] = use_circle_crop
+        self.config['preprocessing']['crop_padding'] = 10  # Default padding
 
         # Set experiment ID
         if exp_id:
@@ -41,6 +51,7 @@ class Trainer:
             self.exp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         print(f"Running experiment: {self.exp_id}")
+        print(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}")
 
         # Create a parent experiment directory
         self.exp_dir = Path(self.config['output']['base_dir']) / f"experiment_{self.exp_id}"
@@ -106,6 +117,7 @@ class Trainer:
         # Add experiment info to tensorboard
         self.writer.add_text('Experiment/ID', self.exp_id, 0)
         self.writer.add_text('Experiment/Config', str(self.config), 0)
+        self.writer.add_text('Experiment/CircleCrop', str(use_circle_crop), 0)
 
         # Save configuration to the experiment directory using the custom encoder
         with open(self.exp_dir / 'config.json', 'w') as f:
@@ -115,24 +127,31 @@ class Trainer:
         """Setup datasets and dataloaders."""
         print("Setting up datasets...")
 
+        # Get crop padding from config
+        crop_padding = self.config.get('preprocessing', {}).get('crop_padding', 10)
+
         # Create datasets from the same directory with different splits
-        self.train_dataset = HSI_OCTA_Dataset(
+        self.train_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=str(self.config['data']['data_dir']),
             transform=self.transform,
             split='train',
             target_size=self.config['data']['target_size'],
             val_ratio=self.config['data']['val_ratio'],
-            test_ratio=self.config['data']['test_ratio']
+            test_ratio=self.config['data']['test_ratio'],
+            crop_padding=crop_padding,
+            circle_crop=self.use_circle_crop
         )
 
-        self.val_dataset = HSI_OCTA_Dataset(
+        self.val_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=str(self.config['data']['data_dir']),
             transform=self.transform,
             split='val',
             target_size=self.config['data']['target_size'],
             val_ratio=self.config['data']['val_ratio'],
             test_ratio=self.config['data']['test_ratio'],
-            augment=False  # No augmentation for validation
+            augment=False,  # No augmentation for validation
+            crop_padding=crop_padding,
+            circle_crop=self.use_circle_crop
         )
 
         print(f"Train dataset size: {len(self.train_dataset)}")
@@ -239,16 +258,17 @@ class Trainer:
 
                 fake_octa = self.generator(hsi)
 
+                # ... continuing from where your code cut off
                 val_pixel_loss = self.criterion_pixel(fake_octa, octa)
                 val_ssim_loss = self.criterion_ssim(fake_octa, octa)
                 val_loss = val_pixel_loss + val_ssim_loss
 
                 total_val_loss += val_loss.item()
 
-        avg_val_loss = total_val_loss / len(self.val_loader)
-        self.writer.add_scalar('Validation/Loss', avg_val_loss, epoch)
+            avg_val_loss = total_val_loss / len(self.val_loader)
+            self.writer.add_scalar('Validation/Loss', avg_val_loss, epoch)
 
-        return avg_val_loss
+            return avg_val_loss
 
     def train(self):
         """Main training loop."""
@@ -298,6 +318,7 @@ class Trainer:
                         'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                         'val_loss': val_loss,
                         'config': serializable_config,
+                        'circle_crop': self.use_circle_crop
                     }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
 
             # Save regular checkpoint
@@ -314,6 +335,7 @@ class Trainer:
                     'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                     'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
                     'config': serializable_config,
+                    'circle_crop': self.use_circle_crop
                 }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
 
             # Check for early stopping
@@ -350,46 +372,61 @@ class Trainer:
         print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
         print(f"All experiment files saved in: {self.exp_dir}")
 
-
 if __name__ == '__main__':
-    # Create argument parser correctly
-    parser = argparse.ArgumentParser(description='Train HSI to OCTA translation model')
-    parser.add_argument('--config', type=str, required=True,
-                        help='Path to config JSON file')
-    parser.add_argument('--resume', type=str, default=None,
-                        help='Path to checkpoint for resuming training')
-    parser.add_argument('--exp_id', type=str, default=None,
-                        help='Experiment ID (will default to timestamp if not provided)')
+        # Create argument parser correctly
+        parser = argparse.ArgumentParser(description='Train HSI to OCTA translation model')
+        parser.add_argument('--config', type=str, required=True,
+                            help='Path to config JSON file')
+        parser.add_argument('--resume', type=str, default=None,
+                            help='Path to checkpoint for resuming training')
+        parser.add_argument('--exp_id', type=str, default=None,
+                            help='Experiment ID (will default to timestamp if not provided)')
+        parser.add_argument('--circle_crop', action='store_true', default=True,
+                            help='Enable circle detection and cropping')
+        parser.add_argument('--no_circle_crop', action='store_true',
+                            help='Disable circle detection and cropping')
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    try:
-        # Create trainer instance
-        trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
+        # Determine circle crop option (default is True, but can be disabled with --no_circle_crop)
+        use_circle_crop = True
+        if args.no_circle_crop:
+            use_circle_crop = False
 
-        # Resume from checkpoint if specified
-        if args.resume:
-            print(f"Resuming training from checkpoint: {args.resume}")
-            checkpoint = torch.load(args.resume, map_location=trainer.device)
-            trainer.generator.load_state_dict(checkpoint['generator_state_dict'])
-            trainer.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
-            trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
-            trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
-            trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
+        try:
+            # Create trainer instance
+            trainer = Trainer(config_path=args.config, exp_id=args.exp_id, use_circle_crop=use_circle_crop)
 
-            # If resuming, we can use the experiment ID from the checkpoint
-            if 'exp_id' in checkpoint and not args.exp_id:
-                trainer.exp_id = checkpoint['exp_id']
-                print(f"Using experiment ID from checkpoint: {trainer.exp_id}")
+            # Resume from checkpoint if specified
+            if args.resume:
+                print(f"Resuming training from checkpoint: {args.resume}")
+                checkpoint = torch.load(args.resume, map_location=trainer.device)
+                trainer.generator.load_state_dict(checkpoint['generator_state_dict'])
+                trainer.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+                trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
+                trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
+                trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
 
-            start_epoch = checkpoint['epoch'] + 1
-            print(f"Resuming from epoch {start_epoch}")
+                # If resuming, we can use the experiment ID from the checkpoint
+                if 'exp_id' in checkpoint and not args.exp_id:
+                    trainer.exp_id = checkpoint['exp_id']
+                    print(f"Using experiment ID from checkpoint: {trainer.exp_id}")
 
-        # Start training
-        trainer.train()
+                # Check if the checkpoint was trained with circle cropping
+                if 'circle_crop' in checkpoint:
+                    saved_crop = checkpoint['circle_crop']
+                    if saved_crop != use_circle_crop:
+                        print(f"WARNING: Checkpoint was trained with circle_crop={saved_crop}, "
+                              f"but current setting is circle_crop={use_circle_crop}")
 
-    except KeyboardInterrupt:
-        print("\nTraining interrupted by user")
-    except Exception as e:
-        print(f"\nError occurred during training: {str(e)}")
-        raise
+                start_epoch = checkpoint['epoch'] + 1
+                print(f"Resuming from epoch {start_epoch}")
+
+            # Start training
+            trainer.train()
+
+        except KeyboardInterrupt:
+            print("\nTraining interrupted by user")
+        except Exception as e:
+            print(f"\nError occurred during training: {str(e)}")
+            raise

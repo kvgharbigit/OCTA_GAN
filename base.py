@@ -16,6 +16,14 @@ from typing import List, Tuple, Optional, Dict
 # Dataset Implementation
 # =====================
 class HSI_OCTA_Dataset(Dataset):
+    """
+    Dataset class for paired Hyperspectral Imaging (HSI) and Optical Coherence Tomography Angiography (OCTA) data.
+
+    This class handles loading, preprocessing, and augmentation of paired HSI and OCTA retinal images.
+    HSI data is loaded from .h5 files, with each HSI containing multiple spectral bands.
+    OCTA data is loaded from .tiff files and contains angiography information.
+    """
+
     def __init__(self,
                  data_dir: str,
                  transform: Optional[transforms.Compose] = None,
@@ -25,7 +33,19 @@ class HSI_OCTA_Dataset(Dataset):
                  test_ratio: float = 0.4,
                  random_seed: int = 42,
                  target_size: int = 500):
+        """
+        Initialize the HSI-OCTA dataset.
 
+        Args:
+            data_dir: Directory containing patient subdirectories with HSI and OCTA files
+            transform: Optional transforms to apply to loaded images
+            augment: Whether to apply data augmentation
+            split: Dataset split ('train', 'val', or 'test')
+            val_ratio: Fraction of data to use for validation
+            test_ratio: Fraction of data to use for testing
+            random_seed: Random seed for reproducible data splitting
+            target_size: Target image size for resizing
+        """
         self.data_dir = Path(data_dir)
         self.transform = transform
         self.augment = augment
@@ -38,7 +58,7 @@ class HSI_OCTA_Dataset(Dataset):
         # Create paired file mapping
         self.file_pairs = self._create_file_pairs(patient_dirs)
 
-        # Split dataset
+        # Split dataset into train, validation, and test sets
         np.random.seed(random_seed)
         indices = np.arange(len(self.file_pairs))
         np.random.shuffle(indices)
@@ -47,6 +67,7 @@ class HSI_OCTA_Dataset(Dataset):
         val_size = int(len(indices) * val_ratio)
         train_size = len(indices) - test_size - val_size
 
+        # Assign indices based on requested split
         if split == 'train':
             self.indices = indices[:train_size]
         elif split == 'val':
@@ -54,7 +75,7 @@ class HSI_OCTA_Dataset(Dataset):
         else:  # test
             self.indices = indices[train_size + val_size:]
 
-        # Define augmentation pipeline
+        # Define augmentation pipeline if enabled
         self.aug_transforms = transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
@@ -63,9 +84,17 @@ class HSI_OCTA_Dataset(Dataset):
         ]) if augment else None
 
     def _create_file_pairs(self, patient_dirs: List[Path]) -> List[Dict[str, Path]]:
-        """Create pairs of corresponding HSI and OCTA files.
+        """
+        Create pairs of corresponding HSI and OCTA files.
 
-        Accepts both C1 and D1 files, with a preference for C1 when both are present.
+        This method searches each patient directory for HSI files (both C1 and D1 patterns)
+        and OCTA files, then pairs them. It prefers C1 files over D1 when both are present.
+
+        Args:
+            patient_dirs: List of patient directory paths to search
+
+        Returns:
+            List of dictionaries containing paired HSI and OCTA file paths
         """
         pairs = []
         for patient_dir in patient_dirs:
@@ -100,18 +129,30 @@ class HSI_OCTA_Dataset(Dataset):
                 if len(octa_files) != 1:
                     print(f"Warning: Missing or multiple OCTA files in {patient_dir}")
 
-        # Return the list of pairs - THIS WAS MISSING
+        # Return the list of pairs
         return pairs
 
     def _load_hsi(self, hsi_path: Path) -> torch.Tensor:
-        """Load and preprocess HSI data, using every third wavelength."""
+        """
+        Load and preprocess HSI data, using every third wavelength.
+
+        This function loads HSI data from an h5 file, selects every third wavelength band
+        to reduce dimensionality, normalizes the data to [0,1] range, and resizes to the
+        target spatial dimensions.
+
+        Args:
+            hsi_path: Path to the HSI h5 file
+
+        Returns:
+            Preprocessed HSI tensor with shape [31, H, W]
+        """
         with h5py.File(hsi_path, 'r') as hsi_file:
             hsi_img = hsi_file['Cube/Images'][:]
 
             # Get original number of wavelengths
             original_wavelengths = hsi_img.shape[0]
 
-            # Take every third wavelength
+            # Take every third wavelength to reduce dimensionality
             hsi_img = hsi_img[::3]
 
             # Check if we have exactly 31 wavelengths after taking every 3rd one
@@ -161,8 +202,19 @@ class HSI_OCTA_Dataset(Dataset):
             return hsi_img
 
     def _load_octa(self, octa_path: Path) -> torch.Tensor:
-        """Load and preprocess OCTA image with resizing to target size."""
-        octa_img = Image.open(octa_path).convert('L')
+        """
+        Load and preprocess OCTA image with resizing to target size.
+
+        This function loads an OCTA image from a tiff file, converts to grayscale,
+        resizes to the target dimensions, and normalizes to [0,1] range.
+
+        Args:
+            octa_path: Path to the OCTA tiff file
+
+        Returns:
+            Preprocessed OCTA tensor with shape [1, H, W]
+        """
+        octa_img = Image.open(octa_path).convert('L')  # Convert to grayscale
 
         # Resize to target size
         if octa_img.size != (self.target_size, self.target_size):
@@ -176,10 +228,22 @@ class HSI_OCTA_Dataset(Dataset):
         return octa_img
 
     def __len__(self) -> int:
+        """Return the number of samples in the dataset split."""
         return len(self.indices)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, str]:
-        """Load and preprocess a pair of HSI and OCTA images."""
+        """
+        Load and preprocess a pair of HSI and OCTA images.
+
+        Args:
+            idx: Index of the sample to load
+
+        Returns:
+            Tuple containing:
+              - HSI tensor with shape [31, H, W]
+              - OCTA tensor with shape [1, H, W]
+              - Patient ID string
+        """
         # Get file paths for the requested index
         pair = self.file_pairs[self.indices[idx]]
 
@@ -217,44 +281,63 @@ class HSI_OCTA_Dataset(Dataset):
 # Generator Architecture
 # =====================
 class Generator(nn.Module):
-    """Generator network for translating HSI to OCTA images."""
+    """
+    Generator network for translating HSI to OCTA images.
+
+    This architecture uses 3D convolutions to process the spectral dimension of HSI data,
+    employs skip connections to preserve spatial information, and produces a single-channel
+    OCTA output.
+    """
 
     def __init__(self, spectral_channels: int = 31):
+        """
+        Initialize the generator network.
+
+        Args:
+            spectral_channels: Number of spectral channels in the input HSI data
+        """
         super(Generator, self).__init__()
 
-        # Encoder layers
+        # Encoder layers - process 3D input data with spectral dimension reduction
         self.encoder = nn.ModuleList([
             # [B, 1, 31, 500, 500] -> [B, 32, 16, 500, 500]
+            # First encoder layer reduces spectral dimensions by half
             nn.Conv3d(1, 32, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
 
             # [B, 32, 16, 500, 500] -> [B, 64, 8, 500, 500]
+            # Second encoder layer further reduces spectral dimensions
             nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
 
             # [B, 64, 8, 500, 500] -> [B, 128, 4, 500, 500]
+            # Third encoder layer creates deep features with reduced spectral dimensions
             nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))
         ])
 
-        # Skip connections
+        # Skip connections to preserve spatial information
         self.skip_connections = nn.ModuleList([
+            # Process features from first encoder layer for skip connection
             nn.Sequential(
-                nn.Conv3d(32, 32, 1),
+                nn.Conv3d(32, 32, 1),  # 1x1x1 convolution to refine features
                 nn.BatchNorm3d(32),
                 nn.ReLU()
             ),
+            # Process features from second encoder layer for skip connection
             nn.Sequential(
-                nn.Conv3d(64, 64, 1),
+                nn.Conv3d(64, 64, 1),  # 1x1x1 convolution to refine features
                 nn.BatchNorm3d(64),
                 nn.ReLU()
             )
         ])
 
-        # Channel reduction layers after concatenation
+        # Channel reduction layers after concatenation with skip connections
         self.reduction_layers = nn.ModuleList([
+            # Reduce channels after first skip concatenation
             nn.Sequential(
                 nn.Conv2d(192, 128, 1),  # 128 + 64 -> 128
                 nn.BatchNorm2d(128),
                 nn.ReLU()
             ),
+            # Reduce channels after second skip concatenation
             nn.Sequential(
                 nn.Conv2d(160, 128, 1),  # 128 + 32 -> 128
                 nn.BatchNorm2d(128),
@@ -264,6 +347,7 @@ class Generator(nn.Module):
 
         # Decoder layers with corrected channel dimensions
         self.decoder = nn.ModuleList([
+            # First decoder block - maintain high-level features
             nn.Sequential(
                 nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
                 nn.BatchNorm2d(128),
@@ -272,6 +356,7 @@ class Generator(nn.Module):
                 nn.BatchNorm2d(128),
                 nn.ReLU()
             ),
+            # Second decoder block - maintain high-level features
             nn.Sequential(
                 nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
                 nn.BatchNorm2d(128),
@@ -280,6 +365,7 @@ class Generator(nn.Module):
                 nn.BatchNorm2d(128),
                 nn.ReLU()
             ),
+            # Third decoder block - start reducing features
             nn.Sequential(
                 nn.Conv2d(128, 64, 3, 1, 1),  # 128 -> 64
                 nn.BatchNorm2d(64),
@@ -288,35 +374,47 @@ class Generator(nn.Module):
                 nn.BatchNorm2d(32),
                 nn.ReLU()
             ),
+            # Final output layer - generate single-channel OCTA
             nn.Sequential(
                 nn.Conv2d(32, 1, 3, 1, 1),  # 32 -> 1
-                nn.Tanh()
+                nn.Tanh()  # Output in range [-1, 1]
             )
         ])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the generator.
+
+        Args:
+            x: Input HSI tensor with shape [B, 31, 500, 500]
+
+        Returns:
+            Generated OCTA tensor with shape [B, 1, 500, 500]
+        """
         # Input: [B, 31, 500, 500]
         skips = []
-        x = x.unsqueeze(1)  # [B, 1, 31, 500, 500]
+        x = x.unsqueeze(1)  # [B, 1, 31, 500, 500] - Add channel dimension for 3D conv
 
-        # Encoder path
+        # Encoder path with skip connections
         for i, enc_layer in enumerate(self.encoder):
             x = F.relu(enc_layer(x))
             if i < len(self.skip_connections):
                 skip = self.skip_connections[i](x)
                 skips.append(skip)
 
-        # Collapse spectral dimension
-        x = x.max(dim=2)[0]  # [B, 128, 500, 500]
+        # Collapse spectral dimension with max pooling
+        x = x.max(dim=2)[0]  # [B, 128, 500, 500] - Spectral dimension collapsed
 
         # Decoder path with skip connections
         for i, dec_layer in enumerate(self.decoder[:-1]):
             if i < len(skips):
-                skip = skips[-(i + 1)].max(dim=2)[0]
-                x = torch.cat([x, skip], dim=1)
-                x = self.reduction_layers[i](x)
+                # Incorporate skip connection
+                skip = skips[-(i + 1)].max(dim=2)[0]  # Collapse spectral dimension
+                x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
+                x = self.reduction_layers[i](x)  # Reduce channels
             x = dec_layer(x)
 
+        # Final output layer
         return self.decoder[-1](x)
 
 
@@ -324,13 +422,30 @@ class Generator(nn.Module):
 # Discriminator Architecture
 # =====================
 class Discriminator(nn.Module):
-    """PatchGAN discriminator for differentiating between real and generated OCTA images."""
+    """
+    PatchGAN discriminator for differentiating between real and generated OCTA images.
+
+    This discriminator classifies overlapping image patches rather than the whole image,
+    allowing it to focus on local texture details rather than global structure.
+    """
 
     def __init__(self):
+        """Initialize the PatchGAN discriminator network."""
         super(Discriminator, self).__init__()
 
         def discriminator_block(in_channels: int, out_channels: int,
                                 normalize: bool = True) -> List[nn.Module]:
+            """
+            Helper function to create a block of layers for the discriminator.
+
+            Args:
+                in_channels: Number of input channels
+                out_channels: Number of output channels
+                normalize: Whether to include batch normalization
+
+            Returns:
+                List of layers for the block
+            """
             layers = [nn.Conv2d(in_channels, out_channels, 4, stride=2, padding=1)]
             if normalize:
                 layers.append(nn.BatchNorm2d(out_channels))
@@ -339,15 +454,24 @@ class Discriminator(nn.Module):
 
         # For 500x500 input, output will be 31x31 patches
         self.model = nn.Sequential(
-            *discriminator_block(1, 64, normalize=False),
+            *discriminator_block(1, 64, normalize=False),  # No normalization on first layer
             *discriminator_block(64, 128),
             *discriminator_block(128, 256),
             *discriminator_block(256, 512),
             nn.Conv2d(512, 1, 4, padding=1),
-            nn.Sigmoid()
+            nn.Sigmoid()  # Output in range [0, 1] - probability that patch is real
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the discriminator.
+
+        Args:
+            x: Input OCTA tensor with shape [B, 1, 500, 500]
+
+        Returns:
+            Patch-wise classification results with shape [B, 1, 30, 30]
+        """
         return self.model(x)
 
 
@@ -355,16 +479,30 @@ class Discriminator(nn.Module):
 # Perceptual Loss
 # =====================
 class PerceptualLoss(nn.Module):
-    """Perceptual loss using VGG16 features."""
+    """
+    Perceptual loss using VGG16 features.
+
+    This loss compares the feature representations of real and generated images
+    using a pre-trained VGG16 network, encouraging the generator to produce
+    images that are perceptually similar to the targets.
+    """
 
     def __init__(self, layers: List[str] = ['3', '8', '15', '22']):
+        """
+        Initialize the perceptual loss module.
+
+        Args:
+            layers: List of VGG16 layer indices to extract features from
+        """
         super(PerceptualLoss, self).__init__()
         vgg = models.vgg16(pretrained=True)
         vgg.eval()
 
+        # Normalization for ImageNet-pretrained VGG
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                               std=[0.229, 0.224, 0.225])
 
+        # Create feature extractors for each specified layer
         self.feature_extractors = nn.ModuleList()
         previous_layer = 0
 
@@ -373,7 +511,7 @@ class PerceptualLoss(nn.Module):
             layers = []
             for module in list(vgg.features.children())[previous_layer:layer_idx]:
                 if isinstance(module, nn.ReLU):
-                    # Replace in-place ReLU with regular ReLU
+                    # Replace in-place ReLU with regular ReLU to avoid modifying inputs
                     layers.append(nn.ReLU(inplace=False))
                 else:
                     layers.append(module)
@@ -381,16 +519,24 @@ class PerceptualLoss(nn.Module):
             self.feature_extractors.append(sequential)
             previous_layer = layer_idx
 
-        # Freeze parameters
+        # Freeze parameters - we don't want to train VGG
         for param in self.parameters():
             param.requires_grad = False
 
     def _preprocess(self, x: torch.Tensor) -> torch.Tensor:
-        """Convert single-channel image to 3 channels and normalize."""
+        """
+        Convert single-channel image to 3 channels and normalize for VGG.
+
+        Args:
+            x: Single-channel image tensor
+
+        Returns:
+            Preprocessed tensor for VGG input
+        """
         # Clone input to avoid in-place modifications
         x = x.clone()
 
-        # Repeat the single channel 3 times
+        # Repeat the single channel 3 times for RGB input to VGG
         x = x.repeat(1, 3, 1, 1)
 
         # Normalize with ImageNet statistics
@@ -398,12 +544,23 @@ class PerceptualLoss(nn.Module):
         return x
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        # Preprocess inputs
+        """
+        Compute perceptual loss between generated and target images.
+
+        Args:
+            x: Generated image tensor
+            y: Target image tensor
+
+        Returns:
+            Perceptual loss value
+        """
+        # Preprocess inputs for VGG
         x = self._preprocess(x)
         y = self._preprocess(y)
 
         loss = 0
         for extractor in self.feature_extractors:
+            # Extract features
             x = extractor(x)
             y = extractor(y)
 
@@ -414,6 +571,7 @@ class PerceptualLoss(nn.Module):
             x = x / x_norm
             y = y / y_norm
 
+            # Compute MSE loss on normalized features
             loss = loss + F.mse_loss(x, y)
 
         return loss
@@ -425,17 +583,31 @@ class PerceptualLoss(nn.Module):
 class SSIMLoss(nn.Module):
     """
     Structural Similarity Index (SSIM) loss for preserving structural information.
+
+    SSIM measures the similarity between two images based on luminance, contrast,
+    and structure, providing a more perceptually relevant loss than pixel-wise losses.
     """
 
     def __init__(self, window_size: int = 11):
+        """
+        Initialize the SSIM loss module.
+
+        Args:
+            window_size: Size of the Gaussian window
+        """
         super(SSIMLoss, self).__init__()
         self.window_size = window_size
         self.register_buffer('window', self._create_window())
-        self.C1 = 0.01 ** 2
-        self.C2 = 0.03 ** 2
+        self.C1 = 0.01 ** 2  # Constant to stabilize division with weak denominator
+        self.C2 = 0.03 ** 2  # Constant to stabilize division with weak denominator
 
     def _create_window(self) -> torch.Tensor:
-        """Creates a Gaussian window for SSIM computation."""
+        """
+        Creates a Gaussian window for SSIM computation.
+
+        Returns:
+            2D Gaussian kernel as a tensor
+        """
         # Create coordinates
         coords = torch.arange(self.window_size, dtype=torch.float32)
         center = (self.window_size - 1) / 2.0
@@ -449,16 +621,27 @@ class SSIMLoss(nn.Module):
         window = gauss.unsqueeze(0) * gauss.unsqueeze(1)
         window = window / window.sum()
 
-        return window.unsqueeze(0).unsqueeze(0)
+        return window.unsqueeze(0).unsqueeze(0)  # Add batch and channel dimensions
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Compute SSIM loss between generated and target images.
+
+        Args:
+            x: Generated image tensor
+            y: Target image tensor
+
+        Returns:
+            SSIM loss value (1 - SSIM)
+        """
         # Clone inputs to avoid in-place modifications
         x = x.clone()
         y = y.clone()
 
+        # Expand window to match input channels
         window = self.window.expand(x.size(1), 1, self.window_size, self.window_size)
 
-        # Compute means
+        # Compute means using convolution with Gaussian window
         mu_x = F.conv2d(x, window, padding=self.window_size // 2, groups=x.size(1))
         mu_y = F.conv2d(y, window, padding=self.window_size // 2, groups=y.size(1))
 
@@ -475,22 +658,30 @@ class SSIMLoss(nn.Module):
         ssim_map = ((2 * mu_xy + self.C1) * (2 * sigma_xy + self.C2)) / \
                    ((mu_x_sq + mu_y_sq + self.C1) * (sigma_x_sq + sigma_y_sq + self.C2))
 
+        # Return loss (1 - SSIM) since we want to minimize
         return 1 - ssim_map.mean()
+
+
 # =====================
 # Training Configuration
 # =====================
 class TrainingConfig:
-    """Configuration class for training hyperparameters and settings."""
+    """
+    Configuration class for training hyperparameters and settings.
+
+    This class centralizes all training hyperparameters for easy modification.
+    """
 
     def __init__(self):
+        """Initialize with default training parameters."""
         # Training hyperparameters
         self.num_epochs = 200
         self.batch_size = 8
-        self.learning_rate = 0.0002
-        self.beta1 = 0.5
-        self.beta2 = 0.999
+        self.learning_rate = 0.0002  # Standard learning rate for GANs
+        self.beta1 = 0.5  # Adam optimizer beta1
+        self.beta2 = 0.999  # Adam optimizer beta2
 
-        # Loss weights
+        # Loss weights - balance different loss components
         self.lambda_pixel = 100.0  # L1 loss weight
         self.lambda_perceptual = 10.0  # Perceptual loss weight
         self.lambda_ssim = 5.0  # SSIM loss weight
@@ -502,8 +693,8 @@ class TrainingConfig:
         self.validate_interval = 5  # Run validation every N epochs
 
         # Optimizer settings
-        self.weight_decay = 1e-4
-        self.gradient_clip = 1.0
+        self.weight_decay = 1e-4  # L2 regularization
+        self.gradient_clip = 1.0  # Gradient clipping threshold
 
         # Learning rate scheduling
         self.lr_decay_start = 100  # Start learning rate decay after this epoch
@@ -518,15 +709,19 @@ def init_weights(model: nn.Module) -> None:
     """
     Initialize network weights using Xavier initialization.
 
+    This helps with faster convergence at the beginning of training.
+
     Args:
-        model (nn.Module): Neural network module to initialize
+        model: Neural network module to initialize
     """
     classname = model.__class__.__name__
     if classname.find('Conv') != -1:
+        # Initialize convolutional layers with Xavier/Glorot initialization
         init.xavier_normal_(model.weight.data)
         if model.bias is not None:
             init.constant_(model.bias.data, 0.0)
     elif classname.find('BatchNorm') != -1:
+        # Initialize batch norm layers with normal distribution and zeros for bias
         init.normal_(model.weight.data, 1.0, 0.02)
         init.constant_(model.bias.data, 0.0)
 
@@ -535,31 +730,36 @@ def get_scheduler(optimizer: torch.optim.Optimizer, config: dict) -> torch.optim
     """
     Create learning rate scheduler for training.
 
+    Reduces learning rate according to schedule to fine-tune models in later stages.
+
     Args:
-        optimizer (torch.optim.Optimizer): Optimizer to schedule
-        config (dict): Training configuration dictionary
+        optimizer: Optimizer to schedule
+        config: Training configuration dictionary
 
     Returns:
-        torch.optim.lr_scheduler._LRScheduler: Learning rate scheduler
+        Learning rate scheduler
     """
     return torch.optim.lr_scheduler.StepLR(
         optimizer,
         step_size=config['lr_scheduler']['lr_decay_interval'],
         gamma=config['lr_scheduler']['lr_decay_factor'],
-        last_epoch=-1
+        last_epoch=-1  # Start fresh from epoch 0
     )
 
 
 # =====================
-# Training Utils
+# Training Utilities
 # =====================
+
 def save_checkpoint(state: Dict, filename: str) -> None:
     """
     Save training checkpoint to disk.
 
+    This allows resuming training from a saved state and keeps track of the best models.
+
     Args:
-        state (Dict): Dictionary containing model and training state
-        filename (str): Path to save checkpoint
+        state: Dictionary containing model and training state (weights, optimizer state, epoch, etc.)
+        filename: Path to save checkpoint
     """
     torch.save(state, filename)
 
@@ -568,16 +768,26 @@ def load_checkpoint(filename: str, model: nn.Module, optimizer: Optional[torch.o
     """
     Load training checkpoint from disk.
 
+    Restores model weights and optionally optimizer state from a saved checkpoint,
+    allowing training to resume from a specific point.
+
     Args:
-        filename (str): Path to checkpoint file
-        model (nn.Module): Model to load weights into
-        optimizer (Optional[torch.optim.Optimizer]): Optimizer to load state into
+        filename: Path to checkpoint file
+        model: Model to load weights into
+        optimizer: Optimizer to load state into (optional)
 
     Returns:
-        int: The epoch number where training left off
+        The epoch number where training left off
     """
+    # Load the checkpoint from disk
     checkpoint = torch.load(filename)
+
+    # Load model weights
     model.load_state_dict(checkpoint['model_state_dict'])
+
+    # Load optimizer state if provided
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    # Return the epoch where we left off
     return checkpoint['epoch']

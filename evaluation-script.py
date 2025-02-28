@@ -15,11 +15,10 @@ import json
 from datetime import datetime
 import os
 import shutil
+import argparse
 
-from base import (
-    HSI_OCTA_Dataset, Generator, Discriminator,
-    PerceptualLoss, SSIMLoss, TrainingConfig
-)
+from base import Generator, Discriminator, PerceptualLoss, SSIMLoss
+from hsi_octa_dataset_cropped import HSI_OCTA_Dataset_Cropped
 from config_utils import load_config
 from visualization_utils import (
     select_representative_wavelengths,
@@ -36,7 +35,7 @@ class PathEncoder(json.JSONEncoder):
 
 
 class Evaluator:
-    def __init__(self, config_path: str, exp_id: str = None):
+    def __init__(self, config_path: str, exp_id: str = None, use_circle_crop: bool = None):
         """Initialize the evaluator with a config file."""
         # Load configuration
         self.config = load_config(config_path)
@@ -57,6 +56,19 @@ class Evaluator:
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.generator.load_state_dict(checkpoint['generator_state_dict'])
         self.epoch = checkpoint.get('epoch', 'unknown')
+
+        # Determine whether to use circle cropping
+        if use_circle_crop is not None:
+            # Use the explicitly provided value
+            self.use_circle_crop = use_circle_crop
+        elif 'circle_crop' in checkpoint:
+            # Use the value from the checkpoint
+            self.use_circle_crop = checkpoint['circle_crop']
+            print(f"Using circle_crop setting from checkpoint: {self.use_circle_crop}")
+        else:
+            # Default to True if not specified
+            self.use_circle_crop = True
+            print(f"No circle_crop setting found in checkpoint, defaulting to: {self.use_circle_crop}")
 
         # Set experiment ID
         if exp_id:
@@ -108,11 +120,13 @@ class Evaluator:
         shutil.copy(config_path, self.exp_dir / config_filename)
         print(f"Copied checkpoint and config to experiment directory")
 
+        # Log circle crop setting
+        print(f"Circle crop enabled: {self.use_circle_crop}")
+
     def setup_data(self):
         """Setup the test dataset and dataloader."""
 
         data_dir = self.config.get('evaluation', {}).get('data_dir')
-        print(data_dir)
         if not data_dir:
             raise ValueError("Missing data_dir in configuration")
 
@@ -121,13 +135,18 @@ class Evaluator:
         # Get batch size from config or use default
         batch_size = self.config.get('evaluation', {}).get('batch_size', 1)
 
+        # Get crop padding from config or use default
+        crop_padding = self.config.get('preprocessing', {}).get('crop_padding', 10)
+
         # Create test dataset
-        self.test_dataset = HSI_OCTA_Dataset(
+        self.test_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=data_dir,
             transform=self.transform,
             split='test',
             target_size=self.config.get('data', {}).get('target_size', 500),
-            augment=False
+            augment=False,
+            crop_padding=crop_padding,
+            circle_crop=self.use_circle_crop
         )
 
         print(f"Test dataset size: {len(self.test_dataset)} samples")
@@ -289,6 +308,7 @@ class Evaluator:
             'checkpoint_epoch': self.epoch,
             'device': str(self.device),
             'num_test_samples': len(self.test_dataset),
+            'circle_crop': self.use_circle_crop,
             'config_file': self.config,
             'mean_metrics': {
                 metric: float(np.mean(values))
@@ -306,6 +326,7 @@ class Evaluator:
         print(f"Experiment ID: {self.exp_id}")
         print(f"Model checkpoint epoch: {self.epoch}")
         print(f"Number of test samples: {len(self.test_dataset)}")
+        print(f"Circle crop enabled: {self.use_circle_crop}")
         print("-" * 50)
         for metric, values in self.metrics.items():
             if metric != 'patient_id':
@@ -339,19 +360,31 @@ class Evaluator:
 
 
 if __name__ == '__main__':
-    import argparse
-
     parser = argparse.ArgumentParser(description='Evaluate HSI to OCTA translation model')
     parser.add_argument('--config', type=str, required=True,
                         help='Path to evaluation config JSON file')
     parser.add_argument('--exp_id', type=str, default=None,
                         help='Experiment ID (optional - will use ID from checkpoint or config if not provided)')
+    parser.add_argument('--circle_crop', action='store_true',
+                        help='Enable circle detection and cropping')
+    parser.add_argument('--no_circle_crop', action='store_true',
+                        help='Disable circle detection and cropping')
 
     args = parser.parse_args()
 
+    # Determine circle crop option
+    use_circle_crop = None  # By default, use value from checkpoint
+    if args.circle_crop and args.no_circle_crop:
+        print("Warning: Both --circle_crop and --no_circle_crop specified. Using --circle_crop.")
+        use_circle_crop = True
+    elif args.circle_crop:
+        use_circle_crop = True
+    elif args.no_circle_crop:
+        use_circle_crop = False
+
     try:
         # Run evaluation
-        evaluator = Evaluator(args.config, args.exp_id)
+        evaluator = Evaluator(args.config, args.exp_id, use_circle_crop)
         evaluator.evaluate()
     except Exception as e:
         print(f"\nError occurred during evaluation: {str(e)}")
