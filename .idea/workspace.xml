@@ -4,17 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="working model pre-implementation of hsi cropping">
-      <change afterPath="$PROJECT_DIR$/circle_crop_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hsi_octa_dataset_cropped.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/project-readme.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test_circle_crop.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/eval_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/eval_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/evaluation-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/evaluation-script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
-    </list>
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="implemented hsi cropping to field of view" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -91,7 +81,7 @@
       <workItem from="1740277440304" duration="1860000" />
       <workItem from="1740481298315" duration="22000" />
       <workItem from="1740606955625" duration="9000" />
-      <workItem from="1740716789586" duration="13981000" />
+      <workItem from="1740716789586" duration="14350000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -141,7 +131,15 @@
       <option name="project" value="LOCAL" />
       <updated>1740783638074</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="implemented hsi cropping to field of view">
+      <option name="closed" value="true" />
+      <created>1740786058665</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1740786058665</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -150,7 +148,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="test" />
     <MESSAGE value="working model pre-implementation of hsi cropping" />
-    <option name="LAST_COMMIT_MESSAGE" value="working model pre-implementation of hsi cropping" />
+    <MESSAGE value="implemented hsi cropping to field of view" />
+    <option name="LAST_COMMIT_MESSAGE" value="implemented hsi cropping to field of view" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
