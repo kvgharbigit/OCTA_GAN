@@ -2,7 +2,7 @@ import os
 import shutil
 
 # Define the root directory
-root_dir = "/Volumes/Ophthalmic neuroscience-1/Projects/Control Database 2024/"
+root_dir = "/Volumes/Ophthalmic neuroscience/Projects/Control Database 2024"
 
 # Define the relevant folders
 folders = {
@@ -29,6 +29,7 @@ def parse_folder_name(folder, is_coreg):
 def copy_retina_tiff():
     copied_count = 0
     missing_count = 0
+    total_count = 0
 
     for source_folder, target_folder in folders.items():
         source_path = os.path.join(root_dir, source_folder)
@@ -39,8 +40,11 @@ def copy_retina_tiff():
             continue
 
         target_patients = os.listdir(target_path)
+        total_patients = len(target_patients)
+        print(f"Processing {total_patients} patients in {target_folder}...")
 
-        for target_patient in target_patients:
+        for index, target_patient in enumerate(target_patients, start=1):
+            print(f"Processing patient {index}/{total_patients} in {target_folder}...")
             target_patient_path = os.path.join(target_path, target_patient)
             if not os.path.isdir(target_patient_path):
                 continue
@@ -50,7 +54,7 @@ def copy_retina_tiff():
             source_patient_path = os.path.join(source_path, source_patient_folder)
 
             if not os.path.exists(source_patient_path):
-                print(f"Missing source folder for: {target_patient}")
+                print(f"[MISSING] Source folder not found for: {target_patient}")
                 missing_count += 1
                 continue
 
@@ -63,13 +67,19 @@ def copy_retina_tiff():
                     shutil.copy2(source_file, target_file)
                     copied_count += 1
                     found = True
+                    print(f"[COPIED] {file} -> {target_patient_path}")
                     break
 
             if not found:
+                print(f"[MISSING] No RetinaAngiographyEnface TIFF file found for {target_patient}")
                 missing_count += 1
 
-    print(f"Copied {copied_count} RetinaAngiographyEnface TIFF files.")
-    print(f"{missing_count} patient folders did not receive a RetinaAngiographyEnface TIFF file.")
+            total_count += 1
+
+    print("\n--- Summary ---")
+    print(f"Total patients processed: {total_count}")
+    print(f"Total files copied: {copied_count}")
+    print(f"Total missing files: {missing_count}")
 
 
 # Run the function

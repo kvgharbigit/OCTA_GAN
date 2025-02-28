@@ -1,7 +1,7 @@
 {
     "// Training Parameters": null,
-    "num_epochs": 2,
-    "batch_size": 8,
+    "num_epochs": 3,
+    "batch_size": 1,
     "learning_rate": 0.0002,
     "beta1": 0.5,
     "beta2": 0.999,
@@ -18,8 +18,8 @@
     "data": {
         "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN",
         "data_dir": "${base_dir}/DummyData",
-        "val_ratio": 0.5,
-        "test_ratio": 0.15,
+        "val_ratio": 0.25,
+        "test_ratio": 0.25,
         "target_size": 500,
         "random_seed": 42
     },

@@ -6,6 +6,10 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import time
 from tqdm import tqdm
+from datetime import datetime
+import os
+import json
+import argparse  # Add this import
 
 from base import (
     HSI_OCTA_Dataset, Generator, Discriminator,
@@ -13,12 +17,42 @@ from base import (
     init_weights, get_scheduler, save_checkpoint
 )
 from config_utils import load_config, setup_directories, validate_directories
+from visualization_utils import save_sample_visualizations  # New import
+
+
+# Custom JSON encoder to handle Path objects
+class PathEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Path):
+            return str(obj)
+        return super().default(obj)
 
 
 class Trainer:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, exp_id: str = None):
         # Load and validate configuration
         self.config = load_config(config_path)
+
+        # Set experiment ID
+        if exp_id:
+            self.exp_id = exp_id
+        else:
+            # Generate a timestamp-based experiment ID if none provided
+            self.exp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        print(f"Running experiment: {self.exp_id}")
+
+        # Create a parent experiment directory
+        self.exp_dir = Path(self.config['output']['base_dir']) / f"experiment_{self.exp_id}"
+        self.exp_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Created experiment directory: {self.exp_dir}")
+
+        # Modify output paths to be within the experiment directory
+        for key in ['checkpoint_dir', 'results_dir', 'tensorboard_dir', 'visualization_dir']:
+            if key in self.config['output']:
+                orig_name = Path(self.config['output'][key]).name
+                self.config['output'][key] = self.exp_dir / orig_name
+
         setup_directories(self.config)
         validate_directories(self.config)
 
@@ -68,6 +102,14 @@ class Trainer:
 
         # Setup tensorboard
         self.writer = SummaryWriter(str(self.config['output']['tensorboard_dir']))
+
+        # Add experiment info to tensorboard
+        self.writer.add_text('Experiment/ID', self.exp_id, 0)
+        self.writer.add_text('Experiment/Config', str(self.config), 0)
+
+        # Save configuration to the experiment directory using the custom encoder
+        with open(self.exp_dir / 'config.json', 'w') as f:
+            json.dump(self.config, f, indent=4, cls=PathEncoder)
 
     def setup_data(self):
         """Setup datasets and dataloaders."""
@@ -215,11 +257,26 @@ class Trainer:
         print(f"Starting training for {self.config['num_epochs']} epochs")
         print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
 
+        # Create a directory for visual samples
+        vis_dir = self.exp_dir / 'visual_samples'
+        vis_dir.mkdir(parents=True, exist_ok=True)
+
         for epoch in range(self.config['num_epochs']):
             start_time = time.time()
 
             # Train for one epoch
             train_g_loss, train_d_loss = self.train_epoch(epoch)
+
+            # Visualize samples every 2 epochs
+            if epoch % 2 == 0:
+                save_sample_visualizations(
+                    generator=self.generator,
+                    val_loader=self.val_loader,
+                    device=self.device,
+                    writer=self.writer,
+                    epoch=epoch,
+                    output_dir=vis_dir
+                )
 
             # Validate
             if epoch % self.config['validate_interval'] == 0:
@@ -228,26 +285,35 @@ class Trainer:
                 # Save best model
                 if val_loss < self.best_val_loss:
                     self.best_val_loss = val_loss
+
+                    # Convert Path objects to strings for serialization
+                    serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
+
                     save_checkpoint({
                         'epoch': epoch,
+                        'exp_id': self.exp_id,
                         'generator_state_dict': self.generator.state_dict(),
                         'discriminator_state_dict': self.discriminator.state_dict(),
                         'optimizer_G_state_dict': self.optimizer_G.state_dict(),
                         'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                         'val_loss': val_loss,
-                        'config': self.config,  # Save configuration with checkpoint
-                    }, str(self.config['output']['checkpoint_dir'] / 'best_model.pth'))
+                        'config': serializable_config,
+                    }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
 
             # Save regular checkpoint
             if epoch % self.config['save_interval'] == 0:
+                # Convert Path objects to strings for serialization
+                serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
+
                 save_checkpoint({
                     'epoch': epoch,
+                    'exp_id': self.exp_id,
                     'generator_state_dict': self.generator.state_dict(),
                     'discriminator_state_dict': self.discriminator.state_dict(),
                     'optimizer_G_state_dict': self.optimizer_G.state_dict(),
                     'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                     'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
-                    'config': self.config,  # Save configuration with checkpoint
+                    'config': serializable_config,
                 }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
 
             # Check for early stopping
@@ -282,22 +348,24 @@ class Trainer:
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
         print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
+        print(f"All experiment files saved in: {self.exp_dir}")
 
 
 if __name__ == '__main__':
-    import argparse
-
+    # Create argument parser correctly
     parser = argparse.ArgumentParser(description='Train HSI to OCTA translation model')
     parser.add_argument('--config', type=str, required=True,
                         help='Path to config JSON file')
-    parser.add_argument('--resume', type=str,
+    parser.add_argument('--resume', type=str, default=None,
                         help='Path to checkpoint for resuming training')
+    parser.add_argument('--exp_id', type=str, default=None,
+                        help='Experiment ID (will default to timestamp if not provided)')
 
     args = parser.parse_args()
 
     try:
         # Create trainer instance
-        trainer = Trainer(config_path=args.config)
+        trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
 
         # Resume from checkpoint if specified
         if args.resume:
@@ -308,6 +376,12 @@ if __name__ == '__main__':
             trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
             trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
             trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
+
+            # If resuming, we can use the experiment ID from the checkpoint
+            if 'exp_id' in checkpoint and not args.exp_id:
+                trainer.exp_id = checkpoint['exp_id']
+                print(f"Using experiment ID from checkpoint: {trainer.exp_id}")
+
             start_epoch = checkpoint['epoch'] + 1
             print(f"Resuming from epoch {start_epoch}")
 

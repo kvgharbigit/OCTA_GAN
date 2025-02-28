@@ -22,7 +22,7 @@ class HSI_OCTA_Dataset(Dataset):
                  augment: bool = True,
                  split: str = 'train',
                  val_ratio: float = 0.15,
-                 test_ratio: float = 0.15,
+                 test_ratio: float = 0.4,
                  random_seed: int = 42,
                  target_size: int = 500):
 
@@ -63,29 +63,79 @@ class HSI_OCTA_Dataset(Dataset):
         ]) if augment else None
 
     def _create_file_pairs(self, patient_dirs: List[Path]) -> List[Dict[str, Path]]:
-        """Create pairs of corresponding HSI and OCTA files."""
+        """Create pairs of corresponding HSI and OCTA files.
+
+        Accepts both C1 and D1 files, with a preference for C1 when both are present.
+        """
         pairs = []
         for patient_dir in patient_dirs:
-            hsi_files = list(patient_dir.glob('*C1*.h5'))
+            # Find all HSI files with either C1 or D1 pattern
+            c1_files = list(patient_dir.glob('*C1*.h5'))
+            d1_files = list(patient_dir.glob('*D1*.h5'))
             octa_files = list(patient_dir.glob('*RetinaAngiographyEnface*.tiff'))
 
-            if len(hsi_files) == 1 and len(octa_files) == 1:
+            # Determine which HSI file to use (prefer C1 if available)
+            hsi_file = None
+            if len(c1_files) == 1:
+                hsi_file = c1_files[0]
+            elif len(d1_files) == 1:
+                hsi_file = d1_files[0]
+            elif len(c1_files) > 1:
+                print(f"Warning: Multiple C1 files in {patient_dir}, using first one")
+                hsi_file = c1_files[0]
+            elif len(d1_files) > 1:
+                print(f"Warning: Multiple D1 files in {patient_dir}, using first one")
+                hsi_file = d1_files[0]
+
+            # Create pair if both HSI and OCTA files are available
+            if hsi_file and len(octa_files) == 1:
                 pairs.append({
-                    'hsi': hsi_files[0],
+                    'hsi': hsi_file,
                     'octa': octa_files[0],
                     'patient_id': patient_dir.name
                 })
             else:
-                print(f"Warning: Missing or multiple files in {patient_dir}")
+                if not hsi_file:
+                    print(f"Warning: No suitable HSI files (C1 or D1) found in {patient_dir}")
+                if len(octa_files) != 1:
+                    print(f"Warning: Missing or multiple OCTA files in {patient_dir}")
 
+        # Return the list of pairs - THIS WAS MISSING
         return pairs
 
     def _load_hsi(self, hsi_path: Path) -> torch.Tensor:
         """Load and preprocess HSI data, using every third wavelength."""
         with h5py.File(hsi_path, 'r') as hsi_file:
             hsi_img = hsi_file['Cube/Images'][:]
+
+            # Get original number of wavelengths
+            original_wavelengths = hsi_img.shape[0]
+
             # Take every third wavelength
             hsi_img = hsi_img[::3]
+
+            # Check if we have exactly 31 wavelengths after taking every 3rd one
+            actual_wavelengths = hsi_img.shape[0]
+            expected_wavelengths = 31
+
+            if actual_wavelengths != expected_wavelengths:
+                # Handle the case where we don't have exactly 31 wavelengths
+                print(f"Warning: Expected {expected_wavelengths} wavelengths but got {actual_wavelengths} "
+                      f"after taking every 3rd from {original_wavelengths} wavelengths in {hsi_path.name}")
+
+                if actual_wavelengths > expected_wavelengths:
+                    # If we have too many, trim to exactly 31
+                    hsi_img = hsi_img[:expected_wavelengths]
+                    print(f"  - Trimmed to first {expected_wavelengths} wavelengths")
+                else:
+                    # If we have too few, pad with zeros to reach 31
+                    padding_needed = expected_wavelengths - actual_wavelengths
+                    # Create padding array with same spatial dimensions and proper data type
+                    padding = np.zeros((padding_needed, *hsi_img.shape[1:]), dtype=hsi_img.dtype)
+                    # Concatenate with original data
+                    hsi_img = np.concatenate([hsi_img, padding], axis=0)
+                    print(f"  - Padded with {padding_needed} zero wavelength bands")
+
             hsi_img = torch.tensor(hsi_img, dtype=torch.float32)  # Shape: (31, H, W)
 
             # Normalize before resizing
@@ -103,6 +153,10 @@ class HSI_OCTA_Dataset(Dataset):
                         align_corners=False
                     ).squeeze()
                 hsi_img = resized_hsi
+
+            # Final check to ensure correct dimensions
+            assert hsi_img.shape[
+                       0] == expected_wavelengths, f"HSI tensor should have {expected_wavelengths} channels, but has {hsi_img.shape[0]}"
 
             return hsi_img
 
@@ -132,6 +186,14 @@ class HSI_OCTA_Dataset(Dataset):
         # Load both modalities
         hsi_img = self._load_hsi(pair['hsi'])
         octa_img = self._load_octa(pair['octa'])
+
+        # Ensure HSI is 3D (channels, height, width)
+        if hsi_img.dim() == 4:
+            hsi_img = hsi_img.squeeze(0)
+
+        # Ensure OCTA is 3D (channels, height, width)
+        if octa_img.dim() == 4:
+            octa_img = octa_img.squeeze(0)
 
         # Apply same augmentation to both images if enabled
         if self.augment and self.aug_transforms:

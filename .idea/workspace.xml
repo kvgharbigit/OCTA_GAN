@@ -5,10 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="test">
-      <change afterPath="$PROJECT_DIR$/config_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/eval_config.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/file_transfer/create_dataset_dir.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/visualization_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/evaluation-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/evaluation-script.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/file_transfer/copy_retinaenface.py" beforeDir="false" afterPath="$PROJECT_DIR$/file_transfer/copy_retinaenface.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -84,7 +88,10 @@
       <workItem from="1740177064075" duration="9261000" />
       <workItem from="1740207553587" duration="2527000" />
       <workItem from="1740212719951" duration="3127000" />
-      <workItem from="1740277440304" duration="1804000" />
+      <workItem from="1740277440304" duration="1860000" />
+      <workItem from="1740481298315" duration="22000" />
+      <workItem from="1740606955625" duration="9000" />
+      <workItem from="1740716789586" duration="9115000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -110,7 +117,15 @@
       <option name="project" value="LOCAL" />
       <updated>1740216360196</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="test">
+      <option name="closed" value="true" />
+      <created>1740279351916</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1740279351916</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
