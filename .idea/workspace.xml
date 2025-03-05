@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="commit dummy">
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="commit ready for testing with real data">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
@@ -91,7 +91,7 @@
       <workItem from="1740481298315" duration="22000" />
       <workItem from="1740606955625" duration="9000" />
       <workItem from="1740716789586" duration="14715000" />
-      <workItem from="1741178779699" duration="2711000" />
+      <workItem from="1741178779699" duration="3055000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -173,7 +173,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741180602641</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="commit ready for testing with real data">
+      <option name="closed" value="true" />
+      <created>1741182144499</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1741182144500</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -185,7 +193,8 @@
     <MESSAGE value="implemented hsi cropping to field of view" />
     <MESSAGE value="implemented dataloading hierarchical search" />
     <MESSAGE value="commit dummy" />
-    <option name="LAST_COMMIT_MESSAGE" value="commit dummy" />
+    <MESSAGE value="commit ready for testing with real data" />
+    <option name="LAST_COMMIT_MESSAGE" value="commit ready for testing with real data" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
