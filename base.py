@@ -32,7 +32,8 @@ class HSI_OCTA_Dataset(Dataset):
                  val_ratio: float = 0.15,
                  test_ratio: float = 0.4,
                  random_seed: int = 42,
-                 target_size: int = 500):
+                 target_size: int = 500,
+                 approved_csv_path: str = None):  # Added approved_csv_path parameter
         """
         Initialize the HSI-OCTA dataset.
 
@@ -45,12 +46,21 @@ class HSI_OCTA_Dataset(Dataset):
             test_ratio: Fraction of data to use for testing
             random_seed: Random seed for reproducible data splitting
             target_size: Target image size for resizing
+            approved_csv_path: Path to CSV containing approved participant IDs (id_full column)
         """
         self.data_dir = Path(data_dir)
         self.transform = transform
         self.augment = augment
         self.split = split
         self.target_size = target_size
+
+        # Store the approved CSV path
+        self.approved_csv_path = approved_csv_path
+
+        # Load approved IDs if a CSV path is provided
+        self.approved_ids = None
+        if approved_csv_path:
+            self._load_approved_ids()
 
         # Find all patient directories recursively
         self.patient_dirs = self._find_patient_dirs(self.data_dir)
@@ -87,9 +97,20 @@ class HSI_OCTA_Dataset(Dataset):
             transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         ) if augment else None
 
+    def _load_approved_ids(self):
+        """Load approved participant IDs from CSV."""
+        try:
+            approved_df = pd.read_csv(self.approved_csv_path)
+            self.approved_ids = set(approved_df['id_full'].astype(str).tolist())
+            print(f"Loaded {len(self.approved_ids)} approved participant IDs from {self.approved_csv_path}")
+        except Exception as e:
+            print(f"Warning: Could not load approved IDs from {self.approved_csv_path}: {str(e)}")
+            self.approved_ids = None
+
     def _find_patient_dirs(self, parent_dir: Path) -> list:
         """
-        Recursively find all directories that contain patient data.
+        Recursively find all directories that contain patient data,
+        filtering for only approved patient IDs if a list is provided.
 
         A directory is considered a patient directory if it contains
         both HSI (.h5) and OCTA (.tiff) files.
@@ -109,7 +130,25 @@ class HSI_OCTA_Dataset(Dataset):
             octa_files = list(dir_path.glob('*RetinaAngiographyEnface*.tiff'))
 
             if hsi_files and octa_files:
-                patient_dirs.append(dir_path)
+                # Extract patient ID from directory name
+                patient_id = dir_path.name
+
+                # Only include if patient is approved, or if no approval list exists
+                if self.approved_ids is None or patient_id in self.approved_ids:
+                    patient_dirs.append(dir_path)
+
+        # Print statistics about approved vs. found patients if we have an approval list
+        if self.approved_ids is not None:
+            found_ids = set(dir_path.name for dir_path in patient_dirs)
+            missing_ids = self.approved_ids - found_ids
+
+            print(f"Found {len(patient_dirs)} approved patient directories")
+            print(f"Missing {len(missing_ids)} approved patients")
+
+            if missing_ids and len(missing_ids) <= 10:
+                print(f"Missing patients: {missing_ids}")
+            elif missing_ids:
+                print(f"First 10 missing patients: {list(missing_ids)[:10]}...")
 
         return patient_dirs
 

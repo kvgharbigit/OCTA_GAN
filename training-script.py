@@ -130,9 +130,15 @@ class Trainer:
         # Get crop padding from config
         crop_padding = self.config.get('preprocessing', {}).get('crop_padding', 10)
 
+        # Get approved participants CSV path from config
+        approved_csv_path = self.config.get('data', {}).get('approved_csv_path')
+        if approved_csv_path:
+            print(f"Using approved participants from: {approved_csv_path}")
+
         # Create datasets from the same directory with different splits
         self.train_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=str(self.config['data']['data_dir']),
+            approved_csv_path=approved_csv_path,  # Use path from config
             transform=self.transform,
             split='train',
             target_size=self.config['data']['target_size'],
@@ -144,6 +150,7 @@ class Trainer:
 
         self.val_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=str(self.config['data']['data_dir']),
+            approved_csv_path=approved_csv_path,  # Use path from config
             transform=self.transform,
             split='val',
             target_size=self.config['data']['target_size'],
@@ -274,6 +281,12 @@ class Trainer:
         """Main training loop."""
         self.setup_data()
 
+        # Record start time
+        self.start_time = time.time()
+        self.start_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.completed_epochs = 0
+        self.early_stopped = False
+
         print(f"Starting training for {self.config['num_epochs']} epochs")
         print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
 
@@ -286,6 +299,7 @@ class Trainer:
 
             # Train for one epoch
             train_g_loss, train_d_loss = self.train_epoch(epoch)
+            self.completed_epochs = epoch + 1
 
             # Visualize samples every 2 epochs
             if epoch % 2 == 0:
@@ -344,6 +358,7 @@ class Trainer:
                     self.early_stop_counter += 1
                     if self.early_stop_counter >= self.config['early_stopping']['patience']:
                         print(f"\nEarly stopping triggered after {epoch + 1} epochs")
+                        self.early_stopped = True
                         break
                 else:
                     self.early_stop_counter = 0
@@ -364,13 +379,134 @@ class Trainer:
             print(f'Learning Rate: {self.optimizer_G.param_groups[0]["lr"]:.6f}')
             print()
 
+        # Calculate total training time
+        total_training_time = time.time() - self.start_time
+
+        # Generate and save training summary
+        summary_path = self.generate_training_summary(total_training_time)
+
         # Final cleanup
         self.writer.close()
         print("\nTraining completed!")
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
         print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
+        print(f"Training summary saved to: {summary_path}")
         print(f"All experiment files saved in: {self.exp_dir}")
+
+    def generate_training_summary(self, training_time_seconds):
+        """
+        Generate a comprehensive training summary text file with all important information.
+
+        Args:
+            training_time_seconds: Total training time in seconds
+        """
+        # Convert training time to hours, minutes, seconds
+        hours, remainder = divmod(training_time_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        summary_path = self.exp_dir / 'training_summary.txt'
+        print(f"\nGenerating training summary at: {summary_path}")
+
+        with open(summary_path, 'w') as f:
+            # Write header
+            f.write("=" * 80 + "\n")
+            f.write(f"TRAINING SUMMARY: {self.exp_id}\n")
+            f.write("=" * 80 + "\n\n")
+
+            # Write experiment information
+            f.write("EXPERIMENT INFORMATION\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Experiment ID: {self.exp_id}\n")
+            f.write(f"Start time: {self.start_time_str}\n")
+            f.write(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Total training time: {int(hours)}h {int(minutes)}m {int(seconds)}s\n")
+            f.write(f"Circle crop enabled: {self.use_circle_crop}\n\n")
+
+            # Write dataset information
+            f.write("DATASET INFORMATION\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Data directory: {self.config['data']['data_dir']}\n")
+
+            if hasattr(self.train_dataset, 'approved_ids') and self.train_dataset.approved_ids:
+                f.write(f"Approved participants file: {self.train_dataset.approved_csv_path}\n")
+                f.write(f"Total approved participants: {len(self.train_dataset.approved_ids)}\n")
+
+                # Get unique patient IDs from the file pairs
+                train_patients = set(pair['patient_id'] for pair in self.train_dataset.file_pairs)
+                val_patients = set(pair['patient_id'] for pair in self.val_dataset.file_pairs)
+                all_patients = train_patients.union(val_patients)
+
+                f.write(f"Approved participants found: {len(all_patients)}\n")
+                f.write(f"Approved participants missing: {len(self.train_dataset.approved_ids) - len(all_patients)}\n")
+
+            f.write(f"Training samples: {len(self.train_dataset)}\n")
+            f.write(f"Validation samples: {len(self.val_dataset)}\n")
+            f.write(f"Image size: {self.config['data']['target_size']}x{self.config['data']['target_size']}\n\n")
+
+            # Write model information
+            f.write("MODEL INFORMATION\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Spectral channels: {self.config['model']['spectral_channels']}\n")
+
+            # Count generator parameters
+            gen_params = sum(p.numel() for p in self.generator.parameters())
+            disc_params = sum(p.numel() for p in self.discriminator.parameters())
+            f.write(f"Generator parameters: {gen_params:,}\n")
+            f.write(f"Discriminator parameters: {disc_params:,}\n\n")
+
+            # Write training parameters
+            f.write("TRAINING PARAMETERS\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Batch size: {self.config['batch_size']}\n")
+            f.write(f"Learning rate: {self.config['learning_rate']}\n")
+            f.write(f"Number of epochs: {self.config['num_epochs']}\n")
+            f.write(f"Early stopping: {self.config['early_stopping']['enabled']}\n")
+            if self.config['early_stopping']['enabled']:
+                f.write(f"  - Patience: {self.config['early_stopping']['patience']}\n")
+                f.write(f"  - Min delta: {self.config['early_stopping']['min_delta']}\n")
+
+            # Write loss weights
+            f.write("\nLOSS WEIGHTS\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Pixel loss (L1): {self.config['lambda_pixel']}\n")
+            f.write(f"Perceptual loss: {self.config['lambda_perceptual']}\n")
+            f.write(f"SSIM loss: {self.config['lambda_ssim']}\n")
+            f.write(f"Adversarial loss: {self.config['lambda_adv']}\n\n")
+
+            # Write final training results
+            f.write("TRAINING RESULTS\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Completed epochs: {self.completed_epochs}\n")
+            if hasattr(self, 'early_stopped') and self.early_stopped:
+                f.write("Training stopped early: Yes\n")
+            f.write(f"Best validation loss: {self.best_val_loss:.6f}\n")
+            f.write(f"Final learning rate: {self.optimizer_G.param_groups[0]['lr']:.6f}\n\n")
+
+            # Write output directories
+            f.write("OUTPUT DIRECTORIES\n")
+            f.write("-" * 50 + "\n")
+            f.write(f"Base directory: {self.exp_dir}\n")
+            f.write(f"Checkpoints: {self.config['output']['checkpoint_dir']}\n")
+            f.write(f"TensorBoard logs: {self.config['output']['tensorboard_dir']}\n")
+            f.write(
+                f"Visualizations: {self.config['output']['visualization_dir'] if 'visualization_dir' in self.config['output'] else self.exp_dir / 'visual_samples'}\n\n")
+
+            # Write recommendations for evaluation
+            f.write("NEXT STEPS\n")
+            f.write("-" * 50 + "\n")
+            f.write("To evaluate this model, run:\n")
+            f.write(f"python evaluation-script.py --config eval_config.json --exp_id {self.exp_id}_eval\n\n")
+            f.write("Make sure your eval_config.json points to the best model checkpoint at:\n")
+            f.write(f"{self.config['output']['checkpoint_dir'] / 'best_model.pth'}\n\n")
+
+            # Write footer
+            f.write("=" * 80 + "\n")
+            f.write("End of training summary\n")
+            f.write("=" * 80 + "\n")
+
+        print(f"Training summary saved to: {summary_path}")
+        return summary_path
 
 if __name__ == '__main__':
         # Create argument parser correctly

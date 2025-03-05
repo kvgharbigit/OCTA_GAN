@@ -28,11 +28,13 @@ class HSI_OCTA_Dataset_Cropped(HSI_OCTA_Dataset):
                  random_seed: int = 42,
                  target_size: int = 500,
                  crop_padding: int = 10,
-                 circle_crop: bool = True):
+                 circle_crop: bool = True,
+                 approved_csv_path: str = None):  # Add approved_csv_path parameter
 
-        # Initialize the parent class
+        # Initialize the parent class with the approved_csv_path
         super().__init__(data_dir, transform, augment, split,
-                         val_ratio, test_ratio, random_seed, target_size)
+                         val_ratio, test_ratio, random_seed, target_size,
+                         approved_csv_path=approved_csv_path)  # Pass to parent
 
         self.crop_padding = crop_padding
         self.circle_crop = circle_crop

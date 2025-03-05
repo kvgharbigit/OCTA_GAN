@@ -11,9 +11,10 @@
     
     "// Data Parameters": null,
     "data": {
-        "target_size": 500
+        "target_size": 500,
+        "approved_csv_path": "./approved_participants.csv"
     },
-    
+
     "// Hardware Settings": null,
     "hardware": {
         "num_workers": 4,

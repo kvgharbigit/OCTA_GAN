@@ -18,6 +18,7 @@
     "data": {
         "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN",
         "data_dir": "${base_dir}/DummyData",
+        "approved_csv_path": "${base_dir}/approved_participants.csv",
         "val_ratio": 0.25,
         "test_ratio": 0.25,
         "target_size": 500,

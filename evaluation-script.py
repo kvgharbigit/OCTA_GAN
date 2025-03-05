@@ -138,9 +138,15 @@ class Evaluator:
         # Get crop padding from config or use default
         crop_padding = self.config.get('preprocessing', {}).get('crop_padding', 10)
 
+        # Get approved participants CSV path from config
+        approved_csv_path = self.config.get('data', {}).get('approved_csv_path')
+        if approved_csv_path:
+            print(f"Using approved participants from: {approved_csv_path}")
+
         # Create test dataset
         self.test_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=data_dir,
+            approved_csv_path=approved_csv_path,  # Use path from config
             transform=self.transform,
             split='test',
             target_size=self.config.get('data', {}).get('target_size', 500),
