@@ -2,10 +2,10 @@
     "// Evaluation Settings": null,
     "evaluation": {
         "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN",
-        "checkpoint_path": "./output/experiment_exp003/checkpoints/best_model.pth",
+        "checkpoint_path": "./output/experiment_exp004/checkpoints/best_model.pth",
         "data_dir": "./DummyData",
         "output_dir": "./output",
-        "exp_id": "exp003",
+        "exp_id": "exp004",
         "batch_size": 1
     },
     

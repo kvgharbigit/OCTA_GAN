@@ -26,7 +26,7 @@ class HSI_OCTA_Dataset(Dataset):
 
     def __init__(self,
                  data_dir: str,
-                 transform: Optional[transforms.Compose] = None,
+                 transform=None,
                  augment: bool = True,
                  split: str = 'train',
                  val_ratio: float = 0.15,
@@ -37,7 +37,7 @@ class HSI_OCTA_Dataset(Dataset):
         Initialize the HSI-OCTA dataset.
 
         Args:
-            data_dir: Directory containing patient subdirectories with HSI and OCTA files
+            data_dir: Directory containing subdirectories with patient data
             transform: Optional transforms to apply to loaded images
             augment: Whether to apply data augmentation
             split: Dataset split ('train', 'val', or 'test')
@@ -52,11 +52,13 @@ class HSI_OCTA_Dataset(Dataset):
         self.split = split
         self.target_size = target_size
 
-        # Find all patient directories
-        patient_dirs = [d for d in self.data_dir.iterdir() if d.is_dir()]
+        # Find all patient directories recursively
+        self.patient_dirs = self._find_patient_dirs(self.data_dir)
+        print(f"Found {len(self.patient_dirs)} patient directories")
 
         # Create paired file mapping
-        self.file_pairs = self._create_file_pairs(patient_dirs)
+        self.file_pairs = self._create_file_pairs(self.patient_dirs)
+        print(f"Created {len(self.file_pairs)} HSI-OCTA file pairs")
 
         # Split dataset into train, validation, and test sets
         np.random.seed(random_seed)
@@ -75,15 +77,43 @@ class HSI_OCTA_Dataset(Dataset):
         else:  # test
             self.indices = indices[train_size + val_size:]
 
+        print(f"Split '{split}' contains {len(self.indices)} samples")
+
         # Define augmentation pipeline if enabled
-        self.aug_transforms = transforms.Compose([
+        self.aug_transforms = torch.nn.Sequential(
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             transforms.RandomRotation(10),
             transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        ]) if augment else None
+        ) if augment else None
 
-    def _create_file_pairs(self, patient_dirs: List[Path]) -> List[Dict[str, Path]]:
+    def _find_patient_dirs(self, parent_dir: Path) -> list:
+        """
+        Recursively find all directories that contain patient data.
+
+        A directory is considered a patient directory if it contains
+        both HSI (.h5) and OCTA (.tiff) files.
+
+        Args:
+            parent_dir: Parent directory to search
+
+        Returns:
+            List of patient directory paths
+        """
+        patient_dirs = []
+
+        # Process all subdirectories recursively
+        for dir_path in parent_dir.glob('**/'):
+            # Check if this directory contains HSI and OCTA files
+            hsi_files = list(dir_path.glob('*.h5'))
+            octa_files = list(dir_path.glob('*RetinaAngiographyEnface*.tiff'))
+
+            if hsi_files and octa_files:
+                patient_dirs.append(dir_path)
+
+        return patient_dirs
+
+    def _create_file_pairs(self, patient_dirs: list) -> list:
         """
         Create pairs of corresponding HSI and OCTA files.
 
@@ -118,10 +148,14 @@ class HSI_OCTA_Dataset(Dataset):
 
             # Create pair if both HSI and OCTA files are available
             if hsi_file and len(octa_files) == 1:
+                # Extract the patient ID from the directory path
+                # Use the last part of the path as the patient ID if it doesn't have a specific pattern
+                patient_id = patient_dir.name
+
                 pairs.append({
                     'hsi': hsi_file,
                     'octa': octa_files[0],
-                    'patient_id': patient_dir.name
+                    'patient_id': patient_id
                 })
             else:
                 if not hsi_file:
@@ -129,7 +163,6 @@ class HSI_OCTA_Dataset(Dataset):
                 if len(octa_files) != 1:
                     print(f"Warning: Missing or multiple OCTA files in {patient_dir}")
 
-        # Return the list of pairs
         return pairs
 
     def _load_hsi(self, hsi_path: Path) -> torch.Tensor:
@@ -231,7 +264,7 @@ class HSI_OCTA_Dataset(Dataset):
         """Return the number of samples in the dataset split."""
         return len(self.indices)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, str]:
+    def __getitem__(self, idx: int) -> tuple:
         """
         Load and preprocess a pair of HSI and OCTA images.
 

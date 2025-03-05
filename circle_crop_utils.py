@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from skimage import measure
-import cv2
 
 
 def detect_and_crop_circle(hsi_image, octa_image=None, padding=10):
