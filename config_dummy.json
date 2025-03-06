@@ -16,7 +16,7 @@
 
     "// Data Parameters": null,
     "data": {
-        "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN",
+        "base_dir": "Z:\\Projects\\Ophthalmic neuroscience\\Projects\\Kayvan\\OCTA_Roshan_Proj\\OCTA_GAN",
         "data_dir": "${base_dir}/DummyData",
         "approved_csv_path": "${base_dir}/approved_participants.csv",
         "val_ratio": 0.25,
@@ -27,7 +27,7 @@
 
     "// Output Directories": null,
     "output": {
-        "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN/output",
+        "base_dir": "Z:\\Projects\\Ophthalmic neuroscience\\Projects\\Kayvan\\OCTA_Roshan_Proj\\OCTA_GAN\\output",
         "checkpoint_dir": "${base_dir}/checkpoints",
         "results_dir": "${base_dir}/results",
         "tensorboard_dir": "${base_dir}/tensorboard",
