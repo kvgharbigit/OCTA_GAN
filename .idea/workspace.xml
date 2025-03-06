@@ -4,15 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="commit ready for testing with real data">
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="adding approved participants">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_dummy.json" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/eval_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/eval_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/evaluation-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/evaluation-script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hsi_octa_dataset_cropped.py" beforeDir="false" afterPath="$PROJECT_DIR$/hsi_octa_dataset_cropped.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -91,7 +86,8 @@
       <workItem from="1740481298315" duration="22000" />
       <workItem from="1740606955625" duration="9000" />
       <workItem from="1740716789586" duration="14715000" />
-      <workItem from="1741178779699" duration="3055000" />
+      <workItem from="1741178779699" duration="3728000" />
+      <workItem from="1741217412217" duration="683000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -181,7 +177,31 @@
       <option name="project" value="LOCAL" />
       <updated>1741182144500</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="commit ready for testing with real data">
+      <option name="closed" value="true" />
+      <created>1741182226404</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1741182226404</updated>
+    </task>
+    <task id="LOCAL-00013" summary="commit ready for testing with real data">
+      <option name="closed" value="true" />
+      <created>1741182345537</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1741182345537</updated>
+    </task>
+    <task id="LOCAL-00014" summary="adding approved participants">
+      <option name="closed" value="true" />
+      <created>1741182373538</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1741182373539</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -194,7 +214,8 @@
     <MESSAGE value="implemented dataloading hierarchical search" />
     <MESSAGE value="commit dummy" />
     <MESSAGE value="commit ready for testing with real data" />
-    <option name="LAST_COMMIT_MESSAGE" value="commit ready for testing with real data" />
+    <MESSAGE value="adding approved participants" />
+    <option name="LAST_COMMIT_MESSAGE" value="adding approved participants" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
