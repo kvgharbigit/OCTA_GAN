@@ -1,3 +1,5 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -301,8 +303,13 @@ class Trainer:
             train_g_loss, train_d_loss = self.train_epoch(epoch)
             self.completed_epochs = epoch + 1
 
-            # Visualize samples every 2 epochs
-            if epoch % 2 == 0:
+            # Visualize samples at configured interval
+            save_images_interval = self.config.get('logging', {}).get('save_images_interval',
+                                                                      5)  # Default to 5 if not specified
+            save_images_start = self.config.get('logging', {}).get('save_images_interval_start',
+                                                                   0)  # Default to 0 if not specified
+
+            if epoch >= save_images_start and epoch % save_images_interval == 0:
                 save_sample_visualizations(
                     generator=self.generator,
                     val_loader=self.val_loader,

@@ -1,6 +1,6 @@
 {
     "// Training Parameters": null,
-    "num_epochs": 3,
+    "num_epochs": 200,
     "batch_size": 1,
     "learning_rate": 0.0002,
     "beta1": 0.5,
@@ -70,7 +70,8 @@
     "// Logging": null,
     "logging": {
         "print_interval": 100,
-        "save_images_interval": 500
+        "save_images_interval": 5,
+        "save_images_interval_start": 0
     },
 
     "// Hardware Settings": null,
@@ -83,7 +84,7 @@
     "// Early Stopping": null,
     "early_stopping": {
         "enabled": true,
-        "patience": 20,
+        "patience": 20000,
         "min_delta": 0.001
     }
 }

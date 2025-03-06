@@ -15,6 +15,7 @@ from circle_crop_utils import crop_and_resize
 
 
 
+
 class HSI_OCTA_Dataset_Cropped(HSI_OCTA_Dataset):
     """Extension of HSI_OCTA_Dataset with circle detection and cropping."""
 
@@ -29,12 +30,12 @@ class HSI_OCTA_Dataset_Cropped(HSI_OCTA_Dataset):
                  target_size: int = 500,
                  crop_padding: int = 10,
                  circle_crop: bool = True,
-                 approved_csv_path: str = None):  # Add approved_csv_path parameter
+                 approved_csv_path: str = None):
 
         # Initialize the parent class with the approved_csv_path
         super().__init__(data_dir, transform, augment, split,
                          val_ratio, test_ratio, random_seed, target_size,
-                         approved_csv_path=approved_csv_path)  # Pass to parent
+                         approved_csv_path=approved_csv_path)
 
         self.crop_padding = crop_padding
         self.circle_crop = circle_crop

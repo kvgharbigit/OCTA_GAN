@@ -106,11 +106,13 @@ def save_sample_visualizations(generator, val_loader, device, writer, epoch, out
         octa_norm = (octa + 1) / 2
         fake_octa_norm = (fake_octa + 1) / 2
 
+        # Move tensors to CPU for visualization processing
+        hsi_np = hsi_norm.cpu().squeeze().numpy()
+        octa_gray = octa_norm.cpu().squeeze().repeat(3, 1, 1)
+        fake_octa_gray = fake_octa_norm.cpu().squeeze().repeat(3, 1, 1)
+
         # Select representative wavelength indices
         wavelength_indices = select_representative_wavelengths()
-
-        # Create RGB-like representation of HSI
-        hsi_np = hsi_norm.squeeze().cpu().numpy()
 
         # Select wavelength indices for RGB-like representation
         rgb_hsi = np.stack([
@@ -121,9 +123,9 @@ def save_sample_visualizations(generator, val_loader, device, writer, epoch, out
 
         # Normalize each channel
         rgb_hsi = np.stack([
-            normalize_wavelength_image(rgb_hsi[0]).squeeze(),
-            normalize_wavelength_image(rgb_hsi[1]).squeeze(),
-            normalize_wavelength_image(rgb_hsi[2]).squeeze()
+            normalize_wavelength_image(rgb_hsi[0]).squeeze().cpu().numpy(),
+            normalize_wavelength_image(rgb_hsi[1]).squeeze().cpu().numpy(),
+            normalize_wavelength_image(rgb_hsi[2]).squeeze().cpu().numpy()
         ])
 
         # Ensure HSI is a 3-channel image
@@ -132,15 +134,12 @@ def save_sample_visualizations(generator, val_loader, device, writer, epoch, out
         # Convert HSI to tensor with 3 channels
         hsi_rgb_tensor = torch.from_numpy(hsi_rgb).permute(2, 0, 1)
 
-        # Convert OCTA images to grayscale images (3 channel)
-        fake_octa_gray = fake_octa_norm.squeeze().repeat(3, 1, 1)
-        octa_gray = octa_norm.squeeze().repeat(3, 1, 1)
-
         # Create a grid of images: HSI (RGB-like), Generated OCTA, Real OCTA
+        # Make sure all tensors are on the same device (CPU in this case)
         img_grid = torch.stack([
-            hsi_rgb_tensor,  # HSI (RGB-like)
-            fake_octa_gray,  # Generated OCTA
-            octa_gray  # Real OCTA
+            hsi_rgb_tensor,  # HSI (RGB-like) already on CPU
+            fake_octa_gray,  # Generated OCTA (moved to CPU above)
+            octa_gray       # Real OCTA (moved to CPU above)
         ])
 
         # Log to TensorBoard
