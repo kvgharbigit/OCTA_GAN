@@ -1,7 +1,7 @@
 {
     "// Training Parameters": null,
     "num_epochs": 300,
-    "batch_size": 8,
+    "batch_size": 2,
     "learning_rate": 0.0002,
     "beta1": 0.5,
     "beta2": 0.999,
@@ -36,7 +36,7 @@
 
     "// Checkpointing": null,
     "save_interval": 10,
-    "validate_interval": 5,
+    "validate_interval": 3,
 
     "// Learning Rate Scheduling": null,
     "lr_scheduler": {
