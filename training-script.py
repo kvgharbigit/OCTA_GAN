@@ -1,5 +1,5 @@
-import os
 
+import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
@@ -13,6 +13,8 @@ from datetime import datetime
 import os
 import json
 import argparse
+import csv
+import shutil
 
 from base import (
     Generator, Discriminator,
@@ -46,7 +48,25 @@ class Trainer:
             'd_loss': [],
             'pixel_loss': [],
             'perceptual_loss': [],
-            'ssim_loss': []
+            'ssim_loss': [],
+            'gan_loss': []
+        }
+
+        # Initialize lists to store metrics history
+        self.metrics_history = {
+            'epoch': [],
+            'g_loss_total': [],
+            'd_loss': [],
+            'gan_loss_unweighted': [],
+            'pixel_loss_unweighted': [],
+            'perceptual_loss_unweighted': [],
+            'ssim_loss_unweighted': [],
+            'gan_loss_weighted': [],
+            'pixel_loss_weighted': [],
+            'perceptual_loss_weighted': [],
+            'ssim_loss_weighted': [],
+            'val_loss': [],
+            'learning_rate': []
         }
 
         # Update config with circle crop option
@@ -141,6 +161,51 @@ class Trainer:
         self.completed_epochs = 0
         self.early_stopped = False
 
+        # Create the CSV file with headers
+        self.csv_path = self.exp_dir / 'training_metrics.csv'
+        with open(self.csv_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([
+                'epoch',
+                'g_loss_total',
+                'd_loss',
+                'gan_loss_unweighted',
+                'pixel_loss_unweighted',
+                'perceptual_loss_unweighted',
+                'ssim_loss_unweighted',
+                'gan_loss_weighted',
+                'pixel_loss_weighted',
+                'perceptual_loss_weighted',
+                'ssim_loss_weighted',
+                'val_loss',
+                'learning_rate'
+            ])
+
+    def update_csv(self, metrics_dict):
+        """Append a row of metrics to the CSV file."""
+        with open(self.csv_path, 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([
+                metrics_dict.get('epoch', ''),
+                metrics_dict.get('g_loss_total', ''),
+                metrics_dict.get('d_loss', ''),
+                metrics_dict.get('gan_loss_unweighted', ''),
+                metrics_dict.get('pixel_loss_unweighted', ''),
+                metrics_dict.get('perceptual_loss_unweighted', ''),
+                metrics_dict.get('ssim_loss_unweighted', ''),
+                metrics_dict.get('gan_loss_weighted', ''),
+                metrics_dict.get('pixel_loss_weighted', ''),
+                metrics_dict.get('perceptual_loss_weighted', ''),
+                metrics_dict.get('ssim_loss_weighted', ''),
+                metrics_dict.get('val_loss', ''),
+                metrics_dict.get('learning_rate', '')
+            ])
+
+        # Update the metrics history for tracking
+        for key, value in metrics_dict.items():
+            if key in self.metrics_history and value != '':
+                self.metrics_history[key].append(value)
+
     def setup_data(self):
         """Setup datasets and dataloaders."""
         print("Setting up datasets...")
@@ -208,9 +273,14 @@ class Trainer:
         self.epoch_losses = {
             'g_loss': [],
             'd_loss': [],
+            'gan_loss': [],
             'pixel_loss': [],
             'perceptual_loss': [],
-            'ssim_loss': []
+            'ssim_loss': [],
+            'gan_loss_weighted': [],
+            'pixel_loss_weighted': [],
+            'perceptual_loss_weighted': [],
+            'ssim_loss_weighted': []
         }
 
         total_g_loss = 0
@@ -250,12 +320,21 @@ class Trainer:
             self.optimizer_G.zero_grad()
 
             fake_output = self.discriminator(fake_octa)
-            g_gan_loss = self.criterion_gan(fake_output, real_label)
-            g_pixel_loss = self.criterion_pixel(fake_octa, octa) * self.config['lambda_pixel']
-            g_perceptual_loss = self.criterion_perceptual(fake_octa, octa) * self.config['lambda_perceptual']
-            g_ssim_loss = self.criterion_ssim(fake_octa, octa) * self.config['lambda_ssim']
 
-            g_loss = g_gan_loss + g_pixel_loss + g_perceptual_loss + g_ssim_loss
+            # Calculate individual loss components (unweighted)
+            g_gan_loss = self.criterion_gan(fake_output, real_label)
+            g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+            g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+            g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+
+            # Apply weights to get the weighted loss components
+            g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
+            g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
+            g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
+            g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+
+            # Combined G loss
+            g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
             g_loss.backward()
             self.optimizer_G.step()
 
@@ -263,12 +342,19 @@ class Trainer:
             total_g_loss += g_loss.item()
             total_d_loss += d_loss.item()
 
-            # Store losses for epoch averaging
+            # Store unweighted losses for recording
             self.epoch_losses['g_loss'].append(g_loss.item())
             self.epoch_losses['d_loss'].append(d_loss.item())
-            self.epoch_losses['pixel_loss'].append(g_pixel_loss.item())
-            self.epoch_losses['perceptual_loss'].append(g_perceptual_loss.item())
-            self.epoch_losses['ssim_loss'].append(g_ssim_loss.item())
+            self.epoch_losses['gan_loss'].append(g_gan_loss.item())
+            self.epoch_losses['pixel_loss'].append(g_pixel_loss_unweighted.item())
+            self.epoch_losses['perceptual_loss'].append(g_perceptual_loss_unweighted.item())
+            self.epoch_losses['ssim_loss'].append(g_ssim_loss_unweighted.item())
+
+            # Store weighted losses for recording
+            self.epoch_losses['gan_loss_weighted'].append(g_gan_loss_weighted.item())
+            self.epoch_losses['pixel_loss_weighted'].append(g_pixel_loss.item())
+            self.epoch_losses['perceptual_loss_weighted'].append(g_perceptual_loss.item())
+            self.epoch_losses['ssim_loss_weighted'].append(g_ssim_loss.item())
 
             # Print interval logging (optional, for terminal feedback only)
             if i % self.config['logging']['print_interval'] == 0:
@@ -281,22 +367,59 @@ class Trainer:
         avg_g_loss = total_g_loss / len(self.train_loader)
         avg_d_loss = total_d_loss / len(self.train_loader)
 
+        # Calculate averages of all loss components
+        avg_gan_loss = sum(self.epoch_losses['gan_loss']) / len(self.epoch_losses['gan_loss']) if self.epoch_losses[
+            'gan_loss'] else 0
+        avg_pixel_loss = sum(self.epoch_losses['pixel_loss']) / len(self.epoch_losses['pixel_loss']) if \
+        self.epoch_losses['pixel_loss'] else 0
+        avg_perceptual_loss = sum(self.epoch_losses['perceptual_loss']) / len(self.epoch_losses['perceptual_loss']) if \
+        self.epoch_losses['perceptual_loss'] else 0
+        avg_ssim_loss = sum(self.epoch_losses['ssim_loss']) / len(self.epoch_losses['ssim_loss']) if self.epoch_losses[
+            'ssim_loss'] else 0
+
+        # Calculate averages of weighted loss components
+        avg_gan_loss_weighted = sum(self.epoch_losses['gan_loss_weighted']) / len(
+            self.epoch_losses['gan_loss_weighted']) if self.epoch_losses['gan_loss_weighted'] else 0
+        avg_pixel_loss_weighted = sum(self.epoch_losses['pixel_loss_weighted']) / len(
+            self.epoch_losses['pixel_loss_weighted']) if self.epoch_losses['pixel_loss_weighted'] else 0
+        avg_perceptual_loss_weighted = sum(self.epoch_losses['perceptual_loss_weighted']) / len(
+            self.epoch_losses['perceptual_loss_weighted']) if self.epoch_losses['perceptual_loss_weighted'] else 0
+        avg_ssim_loss_weighted = sum(self.epoch_losses['ssim_loss_weighted']) / len(
+            self.epoch_losses['ssim_loss_weighted']) if self.epoch_losses['ssim_loss_weighted'] else 0
+
         # Log epoch averages to TensorBoard
         self.writer.add_scalar('Train/G_loss', avg_g_loss, epoch)
         self.writer.add_scalar('Train/D_loss', avg_d_loss, epoch)
 
-        # Log component losses if we have data
-        if self.epoch_losses['pixel_loss']:
-            self.writer.add_scalar('Train/Pixel_loss',
-                                   sum(self.epoch_losses['pixel_loss']) / len(self.epoch_losses['pixel_loss']),
-                                   epoch)
-            self.writer.add_scalar('Train/Perceptual_loss',
-                                   sum(self.epoch_losses['perceptual_loss']) / len(
-                                       self.epoch_losses['perceptual_loss']),
-                                   epoch)
-            self.writer.add_scalar('Train/SSIM_loss',
-                                   sum(self.epoch_losses['ssim_loss']) / len(self.epoch_losses['ssim_loss']),
-                                   epoch)
+        # Log component losses
+        self.writer.add_scalar('Train/GAN_loss', avg_gan_loss, epoch)
+        self.writer.add_scalar('Train/Pixel_loss', avg_pixel_loss, epoch)
+        self.writer.add_scalar('Train/Perceptual_loss', avg_perceptual_loss, epoch)
+        self.writer.add_scalar('Train/SSIM_loss', avg_ssim_loss, epoch)
+
+        # Log weighted component losses
+        self.writer.add_scalar('Train/GAN_loss_weighted', avg_gan_loss_weighted, epoch)
+        self.writer.add_scalar('Train/Pixel_loss_weighted', avg_pixel_loss_weighted, epoch)
+        self.writer.add_scalar('Train/Perceptual_loss_weighted', avg_perceptual_loss_weighted, epoch)
+        self.writer.add_scalar('Train/SSIM_loss_weighted', avg_ssim_loss_weighted, epoch)
+
+        # Update the CSV with this epoch's metrics (validation loss will be added later if available)
+        metrics_dict = {
+            'epoch': epoch,
+            'g_loss_total': avg_g_loss,
+            'd_loss': avg_d_loss,
+            'gan_loss_unweighted': avg_gan_loss,
+            'pixel_loss_unweighted': avg_pixel_loss,
+            'perceptual_loss_unweighted': avg_perceptual_loss,
+            'ssim_loss_unweighted': avg_ssim_loss,
+            'gan_loss_weighted': avg_gan_loss_weighted,
+            'pixel_loss_weighted': avg_pixel_loss_weighted,
+            'perceptual_loss_weighted': avg_perceptual_loss_weighted,
+            'ssim_loss_weighted': avg_ssim_loss_weighted,
+            'val_loss': '',  # Will be updated when validation is run
+            'learning_rate': self.optimizer_G.param_groups[0]['lr']
+        }
+        self.update_csv(metrics_dict)
 
         return avg_g_loss, avg_d_loss
 
@@ -314,7 +437,6 @@ class Trainer:
 
                 fake_octa = self.generator(hsi)
 
-                # ... continuing from where your code cut off
                 val_pixel_loss = self.criterion_pixel(fake_octa, octa)
                 val_ssim_loss = self.criterion_ssim(fake_octa, octa)
                 val_loss = val_pixel_loss + val_ssim_loss
@@ -323,6 +445,25 @@ class Trainer:
 
             avg_val_loss = total_val_loss / len(self.val_loader)
             self.writer.add_scalar('Validation/Loss', avg_val_loss, epoch)
+
+            # Update the CSV with the validation loss for this epoch
+            # We need to find the row with this epoch and update it
+            self.metrics_history['val_loss'][-1] = avg_val_loss
+
+            # Update the CSV file
+            with open(self.csv_path, 'r') as csvfile:
+                rows = list(csv.reader(csvfile))
+
+            # Find the row for the current epoch (should be the last row)
+            for i in range(len(rows) - 1, 0, -1):
+                if rows[i][0] == str(epoch):
+                    rows[i][11] = str(avg_val_loss)  # Update validation loss column
+                    break
+
+            # Write the updated rows back to the CSV file
+            with open(self.csv_path, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerows(rows)
 
             return avg_val_loss
 
@@ -424,14 +565,35 @@ class Trainer:
             f.write(f"Best validation loss: {self.best_val_loss:.6f}\n")
             f.write(f"Current learning rate: {self.optimizer_G.param_groups[0]['lr']:.6f}\n\n")
 
+            # Include current metrics if available
+            if self.metrics_history['epoch']:
+                latest_idx = len(self.metrics_history['epoch']) - 1
+                f.write("CURRENT LOSS METRICS\n")
+                f.write("-" * 50 + "\n")
+                f.write(f"Generator loss: {self.metrics_history['g_loss_total'][latest_idx]:.6f}\n")
+                f.write(f"Discriminator loss: {self.metrics_history['d_loss'][latest_idx]:.6f}\n\n")
+
+                f.write("Unweighted loss components:\n")
+                f.write(f"  Pixel loss: {self.metrics_history['pixel_loss_unweighted'][latest_idx]:.6f}\n")
+                f.write(f"  Perceptual loss: {self.metrics_history['perceptual_loss_unweighted'][latest_idx]:.6f}\n")
+                f.write(f"  SSIM loss: {self.metrics_history['ssim_loss_unweighted'][latest_idx]:.6f}\n")
+                f.write(f"  GAN loss: {self.metrics_history['gan_loss_unweighted'][latest_idx]:.6f}\n\n")
+
+                f.write("Weighted loss components:\n")
+                f.write(f"  Pixel loss: {self.metrics_history['pixel_loss_weighted'][latest_idx]:.6f}\n")
+                f.write(f"  Perceptual loss: {self.metrics_history['perceptual_loss_weighted'][latest_idx]:.6f}\n")
+                f.write(f"  SSIM loss: {self.metrics_history['ssim_loss_weighted'][latest_idx]:.6f}\n")
+                f.write(f"  GAN loss: {self.metrics_history['gan_loss_weighted'][latest_idx]:.6f}\n\n")
+
             # Write output directories
             f.write("OUTPUT DIRECTORIES\n")
             f.write("-" * 50 + "\n")
             f.write(f"Base directory: {self.exp_dir}\n")
             f.write(f"Checkpoints: {self.config['output']['checkpoint_dir']}\n")
             f.write(f"TensorBoard logs: {self.config['output']['tensorboard_dir']}\n")
+            f.write(f"CSV metrics: {self.csv_path}\n")
             f.write(
-                f"Visualizations: {self.config['output']['visualization_dir'] if 'visualization_dir' in self.config['output'] else self.exp_dir / 'visual_samples'}\n\n")
+                f"Visual samples: {self.config['output'].get('visualization_dir', self.exp_dir / 'visual_samples')}\n\n")
 
             # Write recommendations for evaluation
             if reason == "best_model" or reason == "final":
@@ -450,18 +612,27 @@ class Trainer:
         print(f"Training summary saved to: {summary_path}")
         return summary_path
 
-    def train(self):
+    def train(self, start_epoch=0):
         """Main training loop."""
         self.setup_data()
 
+        # Record start time if it wasn't already done
+        if not hasattr(self, 'start_time'):
+            self.start_time = time.time()
+            self.start_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        self.completed_epochs = start_epoch
+        self.early_stopped = False
+
         print(f"Starting training for {self.config['num_epochs']} epochs")
         print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
+        print(f"Training metrics will be logged to {self.csv_path}")
 
         # Create a directory for visual samples
         vis_dir = self.exp_dir / 'visual_samples'
         vis_dir.mkdir(parents=True, exist_ok=True)
 
-        for epoch in range(self.config['num_epochs']):
+        for epoch in range(start_epoch, self.config['num_epochs']):
             start_time = time.time()
 
             # Train for one epoch
@@ -505,8 +676,14 @@ class Trainer:
                         'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                         'val_loss': val_loss,
                         'config': serializable_config,
-                        'circle_crop': self.use_circle_crop
+                        'circle_crop': self.use_circle_crop,
+                        'metrics_history': self.metrics_history  # Save metrics history in the checkpoint
                     }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
+
+                    # Generate a special checkpoint as "latest_best.pth" for easy reference
+                    best_model_path = str(self.config['output']['checkpoint_dir'] / f'best_model.pth')
+                    latest_best_path = str(self.config['output']['checkpoint_dir'] / f'latest_best.pth')
+                    shutil.copy2(best_model_path, latest_best_path)
 
                     # Generate training summary when a new best model is saved
                     current_training_time = time.time() - self.start_time
@@ -531,7 +708,8 @@ class Trainer:
                     'optimizer_D_state_dict': self.optimizer_D.state_dict(),
                     'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
                     'config': serializable_config,
-                    'circle_crop': self.use_circle_crop
+                    'circle_crop': self.use_circle_crop,
+                    'metrics_history': self.metrics_history  # Save metrics history in the checkpoint
                 }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
 
             # Check for early stopping
@@ -572,9 +750,10 @@ class Trainer:
         print("\nTraining completed!")
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
-        print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
+        print(f"Training metrics saved to: {self.csv_path}")
         print(f"Training summary saved to: {summary_path}")
         print(f"All experiment files saved in: {self.exp_dir}")
+
 
 
 if __name__ == '__main__':
@@ -590,6 +769,8 @@ if __name__ == '__main__':
                         help='Enable circle detection and cropping')
     parser.add_argument('--no_circle_crop', action='store_true',
                         help='Disable circle detection and cropping')
+    parser.add_argument('--loss_weights', nargs=4, type=float,
+                        help='Override loss weights in format: pixel perceptual ssim adv')
 
     args = parser.parse_args()
 
@@ -602,6 +783,18 @@ if __name__ == '__main__':
         # Create trainer instance
         trainer = Trainer(config_path=args.config, exp_id=args.exp_id, use_circle_crop=use_circle_crop)
 
+        # Override loss weights if specified
+        if args.loss_weights:
+            trainer.config['lambda_pixel'] = args.loss_weights[0]
+            trainer.config['lambda_perceptual'] = args.loss_weights[1]
+            trainer.config['lambda_ssim'] = args.loss_weights[2]
+            trainer.config['lambda_adv'] = args.loss_weights[3]
+            print(f"\nOverriding loss weights with custom values:")
+            print(f"Pixel loss (L1): {trainer.config['lambda_pixel']}")
+            print(f"Perceptual loss: {trainer.config['lambda_perceptual']}")
+            print(f"SSIM loss: {trainer.config['lambda_ssim']}")
+            print(f"Adversarial loss: {trainer.config['lambda_adv']}")
+
         # Resume from checkpoint if specified
         if args.resume:
             print(f"Resuming training from checkpoint: {args.resume}")
@@ -611,6 +804,59 @@ if __name__ == '__main__':
             trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
             trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
             trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
+
+            # Load metrics history if available
+            if 'metrics_history' in checkpoint:
+                trainer.metrics_history = checkpoint['metrics_history']
+                print(f"Loaded metrics history with {len(trainer.metrics_history['epoch'])} previous epochs")
+
+                # Update the CSV file with previously recorded metrics
+                if os.path.exists(trainer.csv_path):
+                    # Backup existing CSV first
+                    backup_path = trainer.csv_path.with_suffix('.bak')
+                    shutil.copy2(trainer.csv_path, backup_path)
+                    print(f"Backed up existing CSV to {backup_path}")
+
+                # Rewrite the CSV with the loaded metrics history
+                with open(trainer.csv_path, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    # Write header
+                    writer.writerow([
+                        'epoch',
+                        'g_loss_total',
+                        'd_loss',
+                        'gan_loss_unweighted',
+                        'pixel_loss_unweighted',
+                        'perceptual_loss_unweighted',
+                        'ssim_loss_unweighted',
+                        'gan_loss_weighted',
+                        'pixel_loss_weighted',
+                        'perceptual_loss_weighted',
+                        'ssim_loss_weighted',
+                        'val_loss',
+                        'learning_rate'
+                    ])
+
+                    # Write data for each epoch
+                    for i in range(len(trainer.metrics_history['epoch'])):
+                        writer.writerow([
+                            trainer.metrics_history['epoch'][i],
+                            trainer.metrics_history['g_loss_total'][i],
+                            trainer.metrics_history['d_loss'][i],
+                            trainer.metrics_history['gan_loss_unweighted'][i],
+                            trainer.metrics_history['pixel_loss_unweighted'][i],
+                            trainer.metrics_history['perceptual_loss_unweighted'][i],
+                            trainer.metrics_history['ssim_loss_unweighted'][i],
+                            trainer.metrics_history['gan_loss_weighted'][i],
+                            trainer.metrics_history['pixel_loss_weighted'][i],
+                            trainer.metrics_history['perceptual_loss_weighted'][i],
+                            trainer.metrics_history['ssim_loss_weighted'][i],
+                            trainer.metrics_history['val_loss'][i] if i < len(
+                                trainer.metrics_history['val_loss']) else '',
+                            trainer.metrics_history['learning_rate'][i]
+                        ])
+
+                print(f"Restored metrics CSV file from checkpoint data")
 
             # If resuming, we can use the experiment ID from the checkpoint
             if 'exp_id' in checkpoint and not args.exp_id:
@@ -625,10 +871,13 @@ if __name__ == '__main__':
                           f"but current setting is circle_crop={use_circle_crop}")
 
             start_epoch = checkpoint['epoch'] + 1
-            print(f"Resuming from epoch {start_epoch}")
+            print(f"Starting training from epoch {start_epoch}/{trainer.config['num_epochs']}")
 
-        # Start training
-        trainer.train()
+            # Start training from the checkpoint epoch
+            trainer.train(start_epoch=start_epoch)
+        else:
+            # Start training from scratch
+            trainer.train(start_epoch=0)
 
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
