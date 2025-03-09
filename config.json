@@ -1,7 +1,7 @@
 {
     "// Training Parameters": null,
-    "num_epochs": 800,
-    "batch_size": 1,
+    "num_epochs": 300,
+    "batch_size": 8,
     "learning_rate": 0.0002,
     "beta1": 0.5,
     "beta2": 0.999,
@@ -10,8 +10,8 @@
 
     "// Loss Weights": null,
     "lambda_pixel": 100.0,
-    "lambda_perceptual": 10.0,
-    "lambda_ssim": 5.0,
+    "lambda_perceptual": 5.0,
+    "lambda_ssim": 50.0,
     "lambda_adv": 1.0,
 
     "// Data Parameters": null,
@@ -40,7 +40,7 @@
 
     "// Learning Rate Scheduling": null,
     "lr_scheduler": {
-        "lr_decay_start": 100,
+        "lr_decay_start": 10000,
         "lr_decay_factor": 0.1,
         "lr_decay_interval": 50
     },
@@ -84,7 +84,7 @@
     "// Early Stopping": null,
     "early_stopping": {
         "enabled": true,
-        "patience": 20000,
+        "patience": 40,
         "min_delta": 0.001
     }
 }

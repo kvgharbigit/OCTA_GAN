@@ -1,4 +1,5 @@
 import os
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
@@ -38,6 +39,15 @@ class Trainer:
 
         # Set option for circle cropping
         self.use_circle_crop = use_circle_crop
+
+        # Initialize dictionary to track losses for epoch averaging
+        self.epoch_losses = {
+            'g_loss': [],
+            'd_loss': [],
+            'pixel_loss': [],
+            'perceptual_loss': [],
+            'ssim_loss': []
+        }
 
         # Update config with circle crop option
         if 'preprocessing' not in self.config:
@@ -125,6 +135,12 @@ class Trainer:
         with open(self.exp_dir / 'config.json', 'w') as f:
             json.dump(self.config, f, indent=4, cls=PathEncoder)
 
+        # Record start time
+        self.start_time = time.time()
+        self.start_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.completed_epochs = 0
+        self.early_stopped = False
+
     def setup_data(self):
         """Setup datasets and dataloaders."""
         print("Setting up datasets...")
@@ -188,6 +204,15 @@ class Trainer:
         self.generator.train()
         self.discriminator.train()
 
+        # Initialize loss tracking for this epoch
+        self.epoch_losses = {
+            'g_loss': [],
+            'd_loss': [],
+            'pixel_loss': [],
+            'perceptual_loss': [],
+            'ssim_loss': []
+        }
+
         total_g_loss = 0
         total_d_loss = 0
 
@@ -238,20 +263,42 @@ class Trainer:
             total_g_loss += g_loss.item()
             total_d_loss += d_loss.item()
 
-            pbar.set_postfix({
-                'G_loss': g_loss.item(),
-                'D_loss': d_loss.item()
-            })
+            # Store losses for epoch averaging
+            self.epoch_losses['g_loss'].append(g_loss.item())
+            self.epoch_losses['d_loss'].append(d_loss.item())
+            self.epoch_losses['pixel_loss'].append(g_pixel_loss.item())
+            self.epoch_losses['perceptual_loss'].append(g_perceptual_loss.item())
+            self.epoch_losses['ssim_loss'].append(g_ssim_loss.item())
 
+            # Print interval logging (optional, for terminal feedback only)
             if i % self.config['logging']['print_interval'] == 0:
-                step = epoch * len(self.train_loader) + i
-                self.writer.add_scalar('Train/G_loss', g_loss.item(), step)
-                self.writer.add_scalar('Train/D_loss', d_loss.item(), step)
-                self.writer.add_scalar('Train/Pixel_loss', g_pixel_loss.item(), step)
-                self.writer.add_scalar('Train/Perceptual_loss', g_perceptual_loss.item(), step)
-                self.writer.add_scalar('Train/SSIM_loss', g_ssim_loss.item(), step)
+                pbar.set_postfix({
+                    'G_loss': g_loss.item(),
+                    'D_loss': d_loss.item()
+                })
 
-        return total_g_loss / len(self.train_loader), total_d_loss / len(self.train_loader)
+        # Calculate average losses for the epoch
+        avg_g_loss = total_g_loss / len(self.train_loader)
+        avg_d_loss = total_d_loss / len(self.train_loader)
+
+        # Log epoch averages to TensorBoard
+        self.writer.add_scalar('Train/G_loss', avg_g_loss, epoch)
+        self.writer.add_scalar('Train/D_loss', avg_d_loss, epoch)
+
+        # Log component losses if we have data
+        if self.epoch_losses['pixel_loss']:
+            self.writer.add_scalar('Train/Pixel_loss',
+                                   sum(self.epoch_losses['pixel_loss']) / len(self.epoch_losses['pixel_loss']),
+                                   epoch)
+            self.writer.add_scalar('Train/Perceptual_loss',
+                                   sum(self.epoch_losses['perceptual_loss']) / len(
+                                       self.epoch_losses['perceptual_loss']),
+                                   epoch)
+            self.writer.add_scalar('Train/SSIM_loss',
+                                   sum(self.epoch_losses['ssim_loss']) / len(self.epoch_losses['ssim_loss']),
+                                   epoch)
+
+        return avg_g_loss, avg_d_loss
 
     def validate(self, epoch: int):
         """Run validation."""
@@ -279,146 +326,33 @@ class Trainer:
 
             return avg_val_loss
 
-    def train(self):
-        """Main training loop."""
-        self.setup_data()
-
-        # Record start time
-        self.start_time = time.time()
-        self.start_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.completed_epochs = 0
-        self.early_stopped = False
-
-        print(f"Starting training for {self.config['num_epochs']} epochs")
-        print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
-
-        # Create a directory for visual samples
-        vis_dir = self.exp_dir / 'visual_samples'
-        vis_dir.mkdir(parents=True, exist_ok=True)
-
-        for epoch in range(self.config['num_epochs']):
-            start_time = time.time()
-
-            # Train for one epoch
-            train_g_loss, train_d_loss = self.train_epoch(epoch)
-            self.completed_epochs = epoch + 1
-
-            # Visualize samples at configured interval
-            save_images_interval = self.config.get('logging', {}).get('save_images_interval',
-                                                                      5)  # Default to 5 if not specified
-            save_images_start = self.config.get('logging', {}).get('save_images_interval_start',
-                                                                   0)  # Default to 0 if not specified
-
-            if epoch >= save_images_start and epoch % save_images_interval == 0:
-                save_sample_visualizations(
-                    generator=self.generator,
-                    val_loader=self.val_loader,
-                    device=self.device,
-                    writer=self.writer,
-                    epoch=epoch,
-                    output_dir=vis_dir
-                )
-
-            # Validate
-            if epoch % self.config['validate_interval'] == 0:
-                val_loss = self.validate(epoch)
-
-                # Save best model
-                if val_loss < self.best_val_loss:
-                    self.best_val_loss = val_loss
-
-                    # Convert Path objects to strings for serialization
-                    serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
-
-                    save_checkpoint({
-                        'epoch': epoch,
-                        'exp_id': self.exp_id,
-                        'generator_state_dict': self.generator.state_dict(),
-                        'discriminator_state_dict': self.discriminator.state_dict(),
-                        'optimizer_G_state_dict': self.optimizer_G.state_dict(),
-                        'optimizer_D_state_dict': self.optimizer_D.state_dict(),
-                        'val_loss': val_loss,
-                        'config': serializable_config,
-                        'circle_crop': self.use_circle_crop
-                    }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
-
-            # Save regular checkpoint
-            if epoch % self.config['save_interval'] == 0:
-                # Convert Path objects to strings for serialization
-                serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
-
-                save_checkpoint({
-                    'epoch': epoch,
-                    'exp_id': self.exp_id,
-                    'generator_state_dict': self.generator.state_dict(),
-                    'discriminator_state_dict': self.discriminator.state_dict(),
-                    'optimizer_G_state_dict': self.optimizer_G.state_dict(),
-                    'optimizer_D_state_dict': self.optimizer_D.state_dict(),
-                    'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
-                    'config': serializable_config,
-                    'circle_crop': self.use_circle_crop
-                }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
-
-            # Check for early stopping
-            if self.config['early_stopping']['enabled']:
-                if val_loss > (self.best_val_loss - self.config['early_stopping']['min_delta']):
-                    self.early_stop_counter += 1
-                    if self.early_stop_counter >= self.config['early_stopping']['patience']:
-                        print(f"\nEarly stopping triggered after {epoch + 1} epochs")
-                        self.early_stopped = True
-                        break
-                else:
-                    self.early_stop_counter = 0
-
-            # Update learning rate
-            self.scheduler_G.step()
-            self.scheduler_D.step()
-
-            # Print epoch summary
-            epoch_time = time.time() - start_time
-            print(f'\nEpoch {epoch + 1}/{self.config["num_epochs"]} Summary:')
-            print(f'Time: {epoch_time:.2f}s')
-            print(f'Generator Loss: {train_g_loss:.4f}')
-            print(f'Discriminator Loss: {train_d_loss:.4f}')
-            if epoch % self.config['validate_interval'] == 0:
-                print(f'Validation Loss: {val_loss:.4f}')
-                print(f'Best Validation Loss: {self.best_val_loss:.4f}')
-            print(f'Learning Rate: {self.optimizer_G.param_groups[0]["lr"]:.6f}')
-            print()
-
-        # Calculate total training time
-        total_training_time = time.time() - self.start_time
-
-        # Generate and save training summary
-        summary_path = self.generate_training_summary(total_training_time)
-
-        # Final cleanup
-        self.writer.close()
-        print("\nTraining completed!")
-        print(f"Best validation loss: {self.best_val_loss:.4f}")
-        print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
-        print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
-        print(f"Training summary saved to: {summary_path}")
-        print(f"All experiment files saved in: {self.exp_dir}")
-
-    def generate_training_summary(self, training_time_seconds):
+    def generate_training_summary(self, training_time_seconds, reason="final"):
         """
         Generate a comprehensive training summary text file with all important information.
 
         Args:
             training_time_seconds: Total training time in seconds
+            reason: The reason for generating the summary ("best_model", "final", etc.)
+
+        Returns:
+            Path to the generated summary file
         """
         # Convert training time to hours, minutes, seconds
         hours, remainder = divmod(training_time_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
 
-        summary_path = self.exp_dir / 'training_summary.txt'
+        # Create a unique filename based on the reason
+        if reason == "final":
+            summary_path = self.exp_dir / 'training_summary.txt'
+        else:
+            summary_path = self.exp_dir / f'training_summary_{reason}.txt'
+
         print(f"\nGenerating training summary at: {summary_path}")
 
         with open(summary_path, 'w') as f:
             # Write header
             f.write("=" * 80 + "\n")
-            f.write(f"TRAINING SUMMARY: {self.exp_id}\n")
+            f.write(f"TRAINING SUMMARY: {self.exp_id} ({reason})\n")
             f.write("=" * 80 + "\n\n")
 
             # Write experiment information
@@ -426,8 +360,8 @@ class Trainer:
             f.write("-" * 50 + "\n")
             f.write(f"Experiment ID: {self.exp_id}\n")
             f.write(f"Start time: {self.start_time_str}\n")
-            f.write(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Total training time: {int(hours)}h {int(minutes)}m {int(seconds)}s\n")
+            f.write(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Training time so far: {int(hours)}h {int(minutes)}m {int(seconds)}s\n")
             f.write(f"Circle crop enabled: {self.use_circle_crop}\n\n")
 
             # Write dataset information
@@ -481,14 +415,14 @@ class Trainer:
             f.write(f"SSIM loss: {self.config['lambda_ssim']}\n")
             f.write(f"Adversarial loss: {self.config['lambda_adv']}\n\n")
 
-            # Write final training results
-            f.write("TRAINING RESULTS\n")
+            # Write training status
+            f.write("TRAINING STATUS\n")
             f.write("-" * 50 + "\n")
             f.write(f"Completed epochs: {self.completed_epochs}\n")
             if hasattr(self, 'early_stopped') and self.early_stopped:
                 f.write("Training stopped early: Yes\n")
             f.write(f"Best validation loss: {self.best_val_loss:.6f}\n")
-            f.write(f"Final learning rate: {self.optimizer_G.param_groups[0]['lr']:.6f}\n\n")
+            f.write(f"Current learning rate: {self.optimizer_G.param_groups[0]['lr']:.6f}\n\n")
 
             # Write output directories
             f.write("OUTPUT DIRECTORIES\n")
@@ -500,76 +434,204 @@ class Trainer:
                 f"Visualizations: {self.config['output']['visualization_dir'] if 'visualization_dir' in self.config['output'] else self.exp_dir / 'visual_samples'}\n\n")
 
             # Write recommendations for evaluation
-            f.write("NEXT STEPS\n")
-            f.write("-" * 50 + "\n")
-            f.write("To evaluate this model, run:\n")
-            f.write(f"python evaluation-script.py --config eval_config.json --exp_id {self.exp_id}_eval\n\n")
-            f.write("Make sure your eval_config.json points to the best model checkpoint at:\n")
-            f.write(f"{self.config['output']['checkpoint_dir'] / 'best_model.pth'}\n\n")
+            if reason == "best_model" or reason == "final":
+                f.write("NEXT STEPS\n")
+                f.write("-" * 50 + "\n")
+                f.write("To evaluate this model, run:\n")
+                f.write(f"python evaluation-script.py --config eval_config.json --exp_id {self.exp_id}_eval\n\n")
+                f.write("Make sure your eval_config.json points to the best model checkpoint at:\n")
+                f.write(f"{self.config['output']['checkpoint_dir'] / 'best_model.pth'}\n\n")
 
             # Write footer
             f.write("=" * 80 + "\n")
-            f.write("End of training summary\n")
+            f.write(f"End of training summary ({reason})\n")
             f.write("=" * 80 + "\n")
 
         print(f"Training summary saved to: {summary_path}")
         return summary_path
 
+    def train(self):
+        """Main training loop."""
+        self.setup_data()
+
+        print(f"Starting training for {self.config['num_epochs']} epochs")
+        print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
+
+        # Create a directory for visual samples
+        vis_dir = self.exp_dir / 'visual_samples'
+        vis_dir.mkdir(parents=True, exist_ok=True)
+
+        for epoch in range(self.config['num_epochs']):
+            start_time = time.time()
+
+            # Train for one epoch
+            train_g_loss, train_d_loss = self.train_epoch(epoch)
+            self.completed_epochs = epoch + 1
+
+            # Visualize samples at configured interval
+            save_images_interval = self.config.get('logging', {}).get('save_images_interval',
+                                                                      5)  # Default to 5 if not specified
+            save_images_start = self.config.get('logging', {}).get('save_images_interval_start',
+                                                                   0)  # Default to 0 if not specified
+
+            if epoch >= save_images_start and epoch % save_images_interval == 0:
+                save_sample_visualizations(
+                    generator=self.generator,
+                    val_loader=self.val_loader,
+                    device=self.device,
+                    writer=self.writer,
+                    epoch=epoch,
+                    output_dir=vis_dir
+                )
+
+            # Validate
+            if epoch % self.config['validate_interval'] == 0:
+                val_loss = self.validate(epoch)
+
+                # Check for new best model
+                if val_loss < self.best_val_loss:
+                    prev_best = self.best_val_loss
+                    self.best_val_loss = val_loss
+
+                    # Convert Path objects to strings for serialization
+                    serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
+
+                    save_checkpoint({
+                        'epoch': epoch,
+                        'exp_id': self.exp_id,
+                        'generator_state_dict': self.generator.state_dict(),
+                        'discriminator_state_dict': self.discriminator.state_dict(),
+                        'optimizer_G_state_dict': self.optimizer_G.state_dict(),
+                        'optimizer_D_state_dict': self.optimizer_D.state_dict(),
+                        'val_loss': val_loss,
+                        'config': serializable_config,
+                        'circle_crop': self.use_circle_crop
+                    }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
+
+                    # Generate training summary when a new best model is saved
+                    current_training_time = time.time() - self.start_time
+                    improvement = ((prev_best - val_loss) / prev_best) * 100 if prev_best != float('inf') else 0
+                    summary_reason = f"best_model_epoch_{epoch}_loss_{val_loss:.6f}_imp_{improvement:.2f}pct"
+                    self.generate_training_summary(current_training_time, reason=summary_reason)
+
+                    print(f"\nNew best model! Validation loss: {val_loss:.6f} (improved by {improvement:.2f}%)")
+                    print(f"Training summary saved for best model at epoch {epoch}")
+
+            # Save regular checkpoint
+            if epoch % self.config['save_interval'] == 0:
+                # Convert Path objects to strings for serialization
+                serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
+
+                save_checkpoint({
+                    'epoch': epoch,
+                    'exp_id': self.exp_id,
+                    'generator_state_dict': self.generator.state_dict(),
+                    'discriminator_state_dict': self.discriminator.state_dict(),
+                    'optimizer_G_state_dict': self.optimizer_G.state_dict(),
+                    'optimizer_D_state_dict': self.optimizer_D.state_dict(),
+                    'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
+                    'config': serializable_config,
+                    'circle_crop': self.use_circle_crop
+                }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
+
+            # Check for early stopping
+            if self.config['early_stopping']['enabled']:
+                if val_loss > (self.best_val_loss - self.config['early_stopping']['min_delta']):
+                    self.early_stop_counter += 1
+                    if self.early_stop_counter >= self.config['early_stopping']['patience']:
+                        print(f"\nEarly stopping triggered after {epoch + 1} epochs")
+                        self.early_stopped = True
+                        break
+                else:
+                    self.early_stop_counter = 0
+
+            # Update learning rate
+            self.scheduler_G.step()
+            self.scheduler_D.step()
+
+            # Print epoch summary
+            epoch_time = time.time() - start_time
+            print(f'\nEpoch {epoch + 1}/{self.config["num_epochs"]} Summary:')
+            print(f'Time: {epoch_time:.2f}s')
+            print(f'Generator Loss: {train_g_loss:.4f}')
+            print(f'Discriminator Loss: {train_d_loss:.4f}')
+            if epoch % self.config['validate_interval'] == 0:
+                print(f'Validation Loss: {val_loss:.4f}')
+                print(f'Best Validation Loss: {self.best_val_loss:.4f}')
+            print(f'Learning Rate: {self.optimizer_G.param_groups[0]["lr"]:.6f}')
+            print()
+
+        # Calculate total training time
+        total_training_time = time.time() - self.start_time
+
+        # Generate and save final training summary
+        summary_path = self.generate_training_summary(total_training_time, reason="final")
+
+        # Final cleanup
+        self.writer.close()
+        print("\nTraining completed!")
+        print(f"Best validation loss: {self.best_val_loss:.4f}")
+        print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
+        print(f"Tensorboard logs saved in: {self.config['output']['tensorboard_dir']}")
+        print(f"Training summary saved to: {summary_path}")
+        print(f"All experiment files saved in: {self.exp_dir}")
+
+
 if __name__ == '__main__':
-        # Create argument parser correctly
-        parser = argparse.ArgumentParser(description='Train HSI to OCTA translation model')
-        parser.add_argument('--config', type=str, required=True,
-                            help='Path to config JSON file')
-        parser.add_argument('--resume', type=str, default=None,
-                            help='Path to checkpoint for resuming training')
-        parser.add_argument('--exp_id', type=str, default=None,
-                            help='Experiment ID (will default to timestamp if not provided)')
-        parser.add_argument('--circle_crop', action='store_true', default=True,
-                            help='Enable circle detection and cropping')
-        parser.add_argument('--no_circle_crop', action='store_true',
-                            help='Disable circle detection and cropping')
+    # Create argument parser correctly
+    parser = argparse.ArgumentParser(description='Train HSI to OCTA translation model')
+    parser.add_argument('--config', type=str, required=True,
+                        help='Path to config JSON file')
+    parser.add_argument('--resume', type=str, default=None,
+                        help='Path to checkpoint for resuming training')
+    parser.add_argument('--exp_id', type=str, default=None,
+                        help='Experiment ID (will default to timestamp if not provided)')
+    parser.add_argument('--circle_crop', action='store_true', default=True,
+                        help='Enable circle detection and cropping')
+    parser.add_argument('--no_circle_crop', action='store_true',
+                        help='Disable circle detection and cropping')
 
-        args = parser.parse_args()
+    args = parser.parse_args()
 
-        # Determine circle crop option (default is True, but can be disabled with --no_circle_crop)
-        use_circle_crop = True
-        if args.no_circle_crop:
-            use_circle_crop = False
+    # Determine circle crop option (default is True, but can be disabled with --no_circle_crop)
+    use_circle_crop = True
+    if args.no_circle_crop:
+        use_circle_crop = False
 
-        try:
-            # Create trainer instance
-            trainer = Trainer(config_path=args.config, exp_id=args.exp_id, use_circle_crop=use_circle_crop)
+    try:
+        # Create trainer instance
+        trainer = Trainer(config_path=args.config, exp_id=args.exp_id, use_circle_crop=use_circle_crop)
 
-            # Resume from checkpoint if specified
-            if args.resume:
-                print(f"Resuming training from checkpoint: {args.resume}")
-                checkpoint = torch.load(args.resume, map_location=trainer.device)
-                trainer.generator.load_state_dict(checkpoint['generator_state_dict'])
-                trainer.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
-                trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
-                trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
-                trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
+        # Resume from checkpoint if specified
+        if args.resume:
+            print(f"Resuming training from checkpoint: {args.resume}")
+            checkpoint = torch.load(args.resume, map_location=trainer.device)
+            trainer.generator.load_state_dict(checkpoint['generator_state_dict'])
+            trainer.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+            trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
+            trainer.optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
+            trainer.best_val_loss = checkpoint.get('val_loss', float('inf'))
 
-                # If resuming, we can use the experiment ID from the checkpoint
-                if 'exp_id' in checkpoint and not args.exp_id:
-                    trainer.exp_id = checkpoint['exp_id']
-                    print(f"Using experiment ID from checkpoint: {trainer.exp_id}")
+            # If resuming, we can use the experiment ID from the checkpoint
+            if 'exp_id' in checkpoint and not args.exp_id:
+                trainer.exp_id = checkpoint['exp_id']
+                print(f"Using experiment ID from checkpoint: {trainer.exp_id}")
 
-                # Check if the checkpoint was trained with circle cropping
-                if 'circle_crop' in checkpoint:
-                    saved_crop = checkpoint['circle_crop']
-                    if saved_crop != use_circle_crop:
-                        print(f"WARNING: Checkpoint was trained with circle_crop={saved_crop}, "
-                              f"but current setting is circle_crop={use_circle_crop}")
+            # Check if the checkpoint was trained with circle cropping
+            if 'circle_crop' in checkpoint:
+                saved_crop = checkpoint['circle_crop']
+                if saved_crop != use_circle_crop:
+                    print(f"WARNING: Checkpoint was trained with circle_crop={saved_crop}, "
+                          f"but current setting is circle_crop={use_circle_crop}")
 
-                start_epoch = checkpoint['epoch'] + 1
-                print(f"Resuming from epoch {start_epoch}")
+            start_epoch = checkpoint['epoch'] + 1
+            print(f"Resuming from epoch {start_epoch}")
 
-            # Start training
-            trainer.train()
+        # Start training
+        trainer.train()
 
-        except KeyboardInterrupt:
-            print("\nTraining interrupted by user")
-        except Exception as e:
-            print(f"\nError occurred during training: {str(e)}")
-            raise
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user")
+    except Exception as e:
+        print(f"\nError occurred during training: {str(e)}")
+        raise

@@ -4,17 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="commit ready for testing with real data">
-      <change beforePath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" afterDir="false" />
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="added requirements">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/circle_crop_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/circle_crop_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_dummy.json" beforeDir="false" afterPath="$PROJECT_DIR$/config_dummy.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_dummy_mac.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hsi_octa_dataset_cropped.py" beforeDir="false" afterPath="$PROJECT_DIR$/hsi_octa_dataset_cropped.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/visualization_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/visualization_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,12 +30,12 @@
     &quot;assignee&quot;: &quot;kvgharbigit&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/kvgharbigit/OCTA_GAN.git&quot;,
-    &quot;accountId&quot;: &quot;240bc2de-6911-42eb-a279-e6fa53e90160&quot;
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/kvgharbigit/OCTA_GAN.git",
+    "accountId": "ed6fbcae-183e-4ac7-859a-cc68c246cfaa"
   }
-}</component>
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 8
 }</component>
@@ -74,7 +67,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-495700d161d3-aa17d162503b-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-243.22562.220" />
+        <option value="bundled-js-predefined-d6986cc7102b-822845ee3bb5-JavaScript-PY-243.23654.177" />
+        <option value="bundled-python-sdk-91d3a02ef49d-43b77aa2d136-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-243.23654.177" />
       </set>
     </attachedChunks>
   </component>
@@ -94,6 +88,7 @@
       <workItem from="1740606955625" duration="9000" />
       <workItem from="1740716789586" duration="14715000" />
       <workItem from="1741178779699" duration="3055000" />
+      <workItem from="1741503261611" duration="915000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -197,21 +192,5 @@
     <MESSAGE value="commit dummy" />
     <MESSAGE value="commit ready for testing with real data" />
     <option name="LAST_COMMIT_MESSAGE" value="commit ready for testing with real data" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/training-script.py</url>
-          <line>255</line>
-          <option name="timeStamp" value="4" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/training-script.py</url>
-          <line>2</line>
-          <option name="timeStamp" value="5" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
 </project>
