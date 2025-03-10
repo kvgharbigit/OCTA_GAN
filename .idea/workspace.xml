@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="epoch logging, batch size, lr decay, early stopping">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,12 +29,12 @@
     &quot;assignee&quot;: &quot;kvgharbigit&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/kvgharbigit/OCTA_GAN.git",
-    "accountId": "ed6fbcae-183e-4ac7-859a-cc68c246cfaa"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/kvgharbigit/OCTA_GAN.git&quot;,
+    &quot;accountId&quot;: &quot;ed6fbcae-183e-4ac7-859a-cc68c246cfaa&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 8
 }</component>
@@ -185,7 +185,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741504468032</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="ReduceLRonPlateau">
+      <option name="closed" value="true" />
+      <created>1741579650550</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1741579650550</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -199,6 +207,7 @@
     <MESSAGE value="commit dummy" />
     <MESSAGE value="commit ready for testing with real data" />
     <MESSAGE value="epoch logging, batch size, lr decay, early stopping" />
-    <option name="LAST_COMMIT_MESSAGE" value="epoch logging, batch size, lr decay, early stopping" />
+    <MESSAGE value="ReduceLRonPlateau" />
+    <option name="LAST_COMMIT_MESSAGE" value="ReduceLRonPlateau" />
   </component>
 </project>

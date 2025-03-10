@@ -10,9 +10,9 @@
 
     "// Loss Weights": null,
     "lambda_pixel": 100.0,
-    "lambda_perceptual": 5.0,
+    "lambda_perceptual": 50.0,
     "lambda_ssim": 50.0,
-    "lambda_adv": 1.0,
+    "lambda_adv": 10.0,
 
     "// Data Parameters": null,
     "data": {
