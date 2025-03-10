@@ -494,20 +494,7 @@ The project uses JSON configuration files with the following key sections:
 ### Using Approved Participants
 The model supports filtering participants through an `approved_participants.csv` file that contains a list of approved participant IDs. The IDs are matched against the directory names in the data folder.
 
-## Citation
 
-If you use this code or model in your research, please cite:
-
-```
-@misc{hsi-octa-translation,
-  author = {Your Name},
-  title = {HSI to OCTA Translation},
-  year = {2025},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/yourusername/hsi-octa-translation}}
-}
-```
 
 ## License
 

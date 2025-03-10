@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="Added dynamic LR decay&#10;Increase  GAN loss by factor of 10 and Perceptual by Factor 50" />
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="new readme">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/readme.md" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -85,6 +88,8 @@
       <workItem from="1740716789586" duration="14715000" />
       <workItem from="1741178779699" duration="3055000" />
       <workItem from="1741503261611" duration="1895000" />
+      <workItem from="1741610006065" duration="213000" />
+      <workItem from="1741610328263" duration="15000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -198,7 +203,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741580257175</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="new readme">
+      <option name="closed" value="true" />
+      <created>1741610266044</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1741610266044</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -214,6 +227,7 @@
     <MESSAGE value="epoch logging, batch size, lr decay, early stopping" />
     <MESSAGE value="ReduceLRonPlateau" />
     <MESSAGE value="Added dynamic LR decay&#10;Increase  GAN loss by factor of 10 and Perceptual by Factor 50" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added dynamic LR decay&#10;Increase  GAN loss by factor of 10 and Perceptual by Factor 50" />
+    <MESSAGE value="new readme" />
+    <option name="LAST_COMMIT_MESSAGE" value="new readme" />
   </component>
 </project>
