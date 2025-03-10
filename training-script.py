@@ -201,10 +201,13 @@ class Trainer:
                 metrics_dict.get('learning_rate', '')
             ])
 
-        # Update the metrics history for tracking
-        for key, value in metrics_dict.items():
-            if key in self.metrics_history and value != '':
-                self.metrics_history[key].append(value)
+            # Update the metrics history for tracking
+            for key, value in metrics_dict.items():
+                if key in self.metrics_history and value != '':
+                    if key not in self.metrics_history or len(self.metrics_history[key]) == 0:
+                        self.metrics_history[key] = [value]  # Initialize if empty
+                    else:
+                        self.metrics_history[key].append(value)
 
     def setup_data(self):
         """Setup datasets and dataloaders."""
@@ -446,9 +449,16 @@ class Trainer:
             avg_val_loss = total_val_loss / len(self.val_loader)
             self.writer.add_scalar('Validation/Loss', avg_val_loss, epoch)
 
-            # Update the CSV with the validation loss for this epoch
-            # We need to find the row with this epoch and update it
-            self.metrics_history['val_loss'][-1] = avg_val_loss
+            # Ensure val_loss list is populated correctly
+            if 'val_loss' not in self.metrics_history:
+                self.metrics_history['val_loss'] = []
+
+            # If the list is shorter than expected, append the value instead of updating
+            if len(self.metrics_history['val_loss']) < len(self.metrics_history['epoch']):
+                self.metrics_history['val_loss'].append(avg_val_loss)
+            else:
+                # Otherwise update the last element
+                self.metrics_history['val_loss'][-1] = avg_val_loss
 
             # Update the CSV file
             with open(self.csv_path, 'r') as csvfile:

@@ -5,10 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="epoch logging, batch size, lr decay, early stopping">
-      <change beforePath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -32,12 +29,12 @@
     &quot;assignee&quot;: &quot;kvgharbigit&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings">{
-  &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/kvgharbigit/OCTA_GAN.git&quot;,
-    &quot;accountId&quot;: &quot;ed6fbcae-183e-4ac7-859a-cc68c246cfaa&quot;
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/kvgharbigit/OCTA_GAN.git",
+    "accountId": "ed6fbcae-183e-4ac7-859a-cc68c246cfaa"
   }
-}</component>
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 8
 }</component>
