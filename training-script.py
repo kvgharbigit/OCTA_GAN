@@ -724,8 +724,16 @@ class Trainer:
                     self.early_stop_counter = 0
 
             # Update learning rate
-            self.scheduler_G.step()
-            self.scheduler_D.step()
+            if isinstance(self.scheduler_G, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                # For ReduceLROnPlateau, we need to provide the validation loss
+                self.scheduler_G.step(val_loss)
+                self.scheduler_D.step(val_loss)
+            else:
+                # For other schedulers like StepLR, just step without arguments
+                self.scheduler_G.step()
+                self.scheduler_D.step()
+
+
 
             # Print epoch summary
             epoch_time = time.time() - start_time

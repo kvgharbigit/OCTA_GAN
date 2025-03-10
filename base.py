@@ -800,11 +800,9 @@ def init_weights(model: nn.Module) -> None:
         init.constant_(model.bias.data, 0.0)
 
 
-def get_scheduler(optimizer: torch.optim.Optimizer, config: dict) -> torch.optim.lr_scheduler._LRScheduler:
+def get_scheduler(optimizer, config):
     """
-    Create learning rate scheduler for training.
-
-    Reduces learning rate according to schedule to fine-tune models in later stages.
+    Create learning rate scheduler based on configuration.
 
     Args:
         optimizer: Optimizer to schedule
@@ -813,12 +811,32 @@ def get_scheduler(optimizer: torch.optim.Optimizer, config: dict) -> torch.optim
     Returns:
         Learning rate scheduler
     """
-    return torch.optim.lr_scheduler.StepLR(
-        optimizer,
-        step_size=config['lr_scheduler']['lr_decay_interval'],
-        gamma=config['lr_scheduler']['lr_decay_factor'],
-        last_epoch=-1  # Start fresh from epoch 0
-    )
+    scheduler_config = config.get('lr_scheduler', {})
+    scheduler_type = scheduler_config.get('type', 'StepLR')
+
+    if scheduler_type == 'StepLR':
+        # Standard step scheduler: reduces LR at fixed intervals
+        return torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=scheduler_config.get('lr_decay_interval', 50),
+            gamma=scheduler_config.get('lr_decay_factor', 0.1),
+            last_epoch=-1
+        )
+    elif scheduler_type == 'ReduceLROnPlateau':
+        # Plateau scheduler: reduces LR when a metric stops improving
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode=scheduler_config.get('mode', 'min'),
+            factor=scheduler_config.get('factor', 0.1),
+            patience=scheduler_config.get('patience', 10),
+            min_lr=scheduler_config.get('min_lr', 1e-6),
+            verbose=scheduler_config.get('verbose', True),
+            threshold=scheduler_config.get('threshold', 1e-4),
+            cooldown=scheduler_config.get('cooldown', 0),
+            threshold_mode=scheduler_config.get('threshold_mode', 'rel')
+        )
+    else:
+        raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
 
 # =====================

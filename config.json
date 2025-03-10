@@ -40,9 +40,18 @@
 
     "// Learning Rate Scheduling": null,
     "lr_scheduler": {
-        "lr_decay_start": 10000,
-        "lr_decay_factor": 0.1,
-        "lr_decay_interval": 50
+    "type": "ReduceLROnPlateau",
+    "mode": "min",
+    "factor": 0.5,
+    "patience": 12,
+    "min_lr": 1e-6,
+    "verbose": true,
+    "threshold": 1e-4,
+    "cooldown": 0,
+    "threshold_mode": "rel",
+
+    "lr_decay_interval": 50,
+    "lr_decay_factor": 0.1
     },
 
     "// Model Architecture": null,
@@ -84,7 +93,7 @@
     "// Early Stopping": null,
     "early_stopping": {
         "enabled": true,
-        "patience": 40,
+        "patience": 50,
         "min_delta": 0.001
     }
 }
