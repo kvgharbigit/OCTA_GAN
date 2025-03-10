@@ -106,22 +106,24 @@ Key architectural components:
 ├── base.py                     # Core model definitions and dataset class
 ├── circle_crop_utils.py        # Circle detection and cropping utilities
 ├── config.json                 # Default configuration
+├── config_dummy.json           # Example configuration for testing
+├── eval_config.json            # Evaluation-specific configuration
 ├── config_utils.py             # Configuration loading and validation
-├── debug-script.py             # Testing and debugging script
-├── diagram.py                  # Architecture diagram
-├── evaluation-script.py        # Evaluation script for trained models
 ├── hsi_octa_dataset_cropped.py # Extended dataset with circle cropping
+├── evaluation-script.py        # Evaluation script for trained models
 ├── test_circle_crop.py         # Testing circle cropping functionality
 ├── training-script.py          # Main training script
-└── visualization_utils.py      # Visualization utilities
+├── visualization_utils.py      # Visualization utilities
+├── test-debug-script.py        # Testing and debugging script
+└── requirements.txt            # Package dependencies
 ```
 
 ## Setup and Installation
 
 ### Requirements
 - Python 3.8+
-- PyTorch 1.8+
-- torchvision
+- PyTorch 2.2.0+
+- torchvision 0.17.0+
 - numpy
 - scipy
 - scikit-image
@@ -258,9 +260,15 @@ Be sure to modify `eval_config.json` to point to the best model checkpoint from 
 ```
 
 ### Circle Crop Testing
+The circle cropping feature automatically detects and crops the circular field of view in retinal images, which improves model performance by focusing on relevant areas.
+
+Test the circle cropping functionality on your data:
 ```bash
 python test_circle_crop.py --data_dir /path/to/data --num_samples 5 --save_path results.png
 ```
+
+Example result of circle cropping:
+![Circle Crop Example](circle_crop_comparison.png)
 
 ## Model Details
 
@@ -321,10 +329,11 @@ Key preprocessing steps:
    - Normalize to [0,1] range
    - Resize to 500×500 spatial dimensions
 
-3. **Circle Cropping (Optional)**:
+3. **Circle Cropping (Optional but Recommended)**:
    - Detect circular field of view in the retinal images
    - Crop to this region with padding
    - Resize back to standard 500×500 dimensions
+   - Preserves the relevant retinal area and eliminates black borders
 
 4. **Data Augmentation**:
    - Random horizontal and vertical flips
@@ -387,9 +396,8 @@ Real OCTA -----+------>| 4. SSIM Loss             |
 - Adam optimizer with learning rate 0.0002
 - Weight decay 1e-4
 - Learning rate decay schedule:
-  - Start decay at epoch 100
-  - Decay factor 0.1
-  - Apply every 50 epochs
+  - ReduceLROnPlateau with patience=12, factor=0.5
+  - Minimum learning rate: 1e-6
 
 ## Visualization
 
@@ -426,20 +434,20 @@ The project uses JSON configuration files with the following key sections:
 ### Training Configuration (`config.json`)
 ```json
 {
-  "num_epochs": 200,
-  "batch_size": 8,
+  "num_epochs": 300,
+  "batch_size": 2,
   "learning_rate": 0.0002,
   "beta1": 0.5,
   "beta2": 0.999,
   "weight_decay": 1e-4,
   "lambda_pixel": 100.0,
-  "lambda_perceptual": 10.0,
-  "lambda_ssim": 5.0,
-  "lambda_adv": 1.0,
+  "lambda_perceptual": 50.0,
+  "lambda_ssim": 50.0,
+  "lambda_adv": 10.0,
   "data": {
     "data_dir": "./DummyData",
-    "val_ratio": 0.15,
-    "test_ratio": 0.4,
+    "val_ratio": 0.1,
+    "test_ratio": 0.2,
     "target_size": 500
   },
   "output": {
@@ -450,8 +458,15 @@ The project uses JSON configuration files with the following key sections:
   },
   "early_stopping": {
     "enabled": true,
-    "patience": 20,
+    "patience": 50,
     "min_delta": 0.001
+  },
+  "lr_scheduler": {
+    "type": "ReduceLROnPlateau",
+    "mode": "min",
+    "factor": 0.5,
+    "patience": 12,
+    "min_lr": 1e-6
   }
 }
 ```
@@ -466,7 +481,8 @@ The project uses JSON configuration files with the following key sections:
     "batch_size": 1
   },
   "data": {
-    "target_size": 500
+    "target_size": 500,
+    "approved_csv_path": "./approved_participants.csv"
   },
   "hardware": {
     "num_workers": 4,
@@ -474,6 +490,9 @@ The project uses JSON configuration files with the following key sections:
   }
 }
 ```
+
+### Using Approved Participants
+The model supports filtering participants through an `approved_participants.csv` file that contains a list of approved participant IDs. The IDs are matched against the directory names in the data folder.
 
 ## Citation
 
