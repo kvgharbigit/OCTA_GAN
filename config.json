@@ -9,10 +9,10 @@
     "gradient_clip": 1.0,
 
     "// Loss Weights": null,
-    "lambda_pixel": 100.0,
-    "lambda_perceptual": 50.0,
-    "lambda_ssim": 50.0,
-    "lambda_adv": 10.0,
+    "lambda_pixel": 0,
+    "lambda_perceptual": 0,
+    "lambda_ssim": 50,
+    "lambda_adv": 10,
 
     "// Data Parameters": null,
     "data": {
@@ -94,6 +94,6 @@
     "early_stopping": {
         "enabled": true,
         "patience": 50,
-        "min_delta": 0.001
+        "min_delta": 0.00001
     }
 }
