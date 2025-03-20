@@ -47,7 +47,7 @@ class HSI_OCTA_Dataset(Dataset):
             test_ratio: Fraction of data to use for testing
             random_seed: Random seed for reproducible data splitting
             target_size: Target image size for resizing
-            approved_csv_path: Path to CSV file with id_full, eye, hsi_file, octa_file columns
+            approved_csv_path: Path to CSV file with id_full, eye, hs_file, octa_file columns
         """
         self.data_dir = Path(data_dir)
         self.transform = transform
@@ -95,7 +95,7 @@ class HSI_OCTA_Dataset(Dataset):
         """Load file pairs from CSV."""
         try:
             df = pd.read_csv(self.approved_csv_path)
-            required_columns = ['id_full', 'eye', 'hsi_file', 'octa_file']
+            required_columns = ['id_full', 'eye', 'hs_file', 'octa_file']
 
             # Check if all required columns exist
             missing_columns = [col for col in required_columns if col not in df.columns]
@@ -110,7 +110,7 @@ class HSI_OCTA_Dataset(Dataset):
 
                 # Add to pairs list
                 self.file_pairs.append({
-                    'hsi': Path(row['hsi_file']),
+                    'hsi': Path(row['hs_file']),
                     'octa': Path(row['octa_file']),
                     'patient_id': patient_id
                 })
@@ -170,10 +170,10 @@ class HSI_OCTA_Dataset(Dataset):
         # Process all subdirectories recursively
         for dir_path in parent_dir.glob('**/'):
             # Check if this directory contains HSI and OCTA files
-            hsi_files = list(dir_path.glob('*.h5'))
+            hs_files = list(dir_path.glob('*.h5'))
             octa_files = list(dir_path.glob('*RetinaAngiographyEnface*.tiff'))
 
-            if hsi_files and octa_files:
+            if hs_files and octa_files:
                 # Extract patient ID from directory name
                 patient_id = dir_path.name
 
@@ -217,31 +217,31 @@ class HSI_OCTA_Dataset(Dataset):
             octa_files = list(patient_dir.glob('*RetinaAngiographyEnface*.tiff'))
 
             # Determine which HSI file to use (prefer C1 if available)
-            hsi_file = None
+            hs_file = None
             if len(c1_files) == 1:
-                hsi_file = c1_files[0]
+                hs_file = c1_files[0]
             elif len(d1_files) == 1:
-                hsi_file = d1_files[0]
+                hs_file = d1_files[0]
             elif len(c1_files) > 1:
                 print(f"Warning: Multiple C1 files in {patient_dir}, using first one")
-                hsi_file = c1_files[0]
+                hs_file = c1_files[0]
             elif len(d1_files) > 1:
                 print(f"Warning: Multiple D1 files in {patient_dir}, using first one")
-                hsi_file = d1_files[0]
+                hs_file = d1_files[0]
 
             # Create pair if both HSI and OCTA files are available
-            if hsi_file and len(octa_files) == 1:
+            if hs_file and len(octa_files) == 1:
                 # Extract the patient ID from the directory path
                 # Use the last part of the path as the patient ID if it doesn't have a specific pattern
                 patient_id = patient_dir.name
 
                 pairs.append({
-                    'hsi': hsi_file,
+                    'hsi': hs_file,
                     'octa': octa_files[0],
                     'patient_id': patient_id
                 })
             else:
-                if not hsi_file:
+                if not hs_file:
                     print(f"Warning: No suitable HSI files (C1 or D1) found in {patient_dir}")
                 if len(octa_files) != 1:
                     print(f"Warning: Missing or multiple OCTA files in {patient_dir}")
@@ -262,8 +262,8 @@ class HSI_OCTA_Dataset(Dataset):
         Returns:
             Preprocessed HSI tensor with shape [31, H, W]
         """
-        with h5py.File(hsi_path, 'r') as hsi_file:
-            hsi_img = hsi_file['Cube/Images'][:]
+        with h5py.File(hsi_path, 'r') as hs_file:
+            hsi_img = hs_file['Cube/Images'][:]
 
             # Get original number of wavelengths
             original_wavelengths = hsi_img.shape[0]

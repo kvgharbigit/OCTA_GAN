@@ -218,8 +218,11 @@ def resize_to_square(image, target_size=500):
 
 def crop_and_resize(hsi_image, octa_image=None, target_size=500, padding=10):
     """
-    Detect circle, crop both HSI and OCTA images, and resize to target size.
-    Always applies circular mask to make the OCTA have black edges like HSI.
+    Resize both HSI and OCTA images to target size first to maintain coregistration,
+    then detect circle, crop, and apply circular mask.
+
+    This approach is better when HSI and OCTA images are perfectly coregistered
+    but have different original resolutions.
 
     Args:
         hsi_image (torch.Tensor): HSI image tensor
@@ -230,11 +233,17 @@ def crop_and_resize(hsi_image, octa_image=None, target_size=500, padding=10):
     Returns:
         tuple: Processed HSI and OCTA images
     """
-    # Detect circle and crop (masking is now always applied)
-    cropped_hsi, cropped_octa = detect_and_crop_circle(hsi_image, octa_image, padding)
+    # First resize both images to target size
+    resized_hsi = resize_to_square(hsi_image, target_size)
+    resized_octa = resize_to_square(octa_image, target_size) if octa_image is not None else None
 
-    # Resize to target size
-    resized_hsi = resize_to_square(cropped_hsi, target_size)
-    resized_octa = resize_to_square(cropped_octa, target_size) if octa_image is not None else None
+    # Then detect circle and crop
+    cropped_hsi, cropped_octa = detect_and_crop_circle(resized_hsi, resized_octa, padding)
 
-    return resized_hsi, resized_octa
+    # If the cropping results in images that are not target_size, resize them back
+    if cropped_hsi.shape[-1] != target_size or cropped_hsi.shape[-2] != target_size:
+        cropped_hsi = resize_to_square(cropped_hsi, target_size)
+        if octa_image is not None:
+            cropped_octa = resize_to_square(cropped_octa, target_size)
+
+    return cropped_hsi, cropped_octa
