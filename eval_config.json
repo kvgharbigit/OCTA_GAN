@@ -4,15 +4,21 @@
         "base_dir": "/Users/pc/Library/CloudStorage/GoogleDrive-kvgharbi99@gmail.com/My Drive/2025 Kayvan/MPhil Opthal/Projects/Python projects/OCTA_GAN",
         "checkpoint_path": "./output/experiment_exp006/checkpoints/best_model.pth",
         "data_dir": "./DummyData",
+        "approved_csv_path": "./approved_patients/approved_participants_global.csv",
         "output_dir": "./output",
         "exp_id": "exp006",
         "batch_size": 1
     },
-    
+
     "// Data Parameters": null,
     "data": {
-        "target_size": 500,
-        "approved_csv_path": "./approved_participants.csv"
+        "target_size": 500
+    },
+
+    "// Preprocessing": null,
+    "preprocessing": {
+        "circle_crop": true,
+        "crop_padding": 10
     },
 
     "// Hardware Settings": null,

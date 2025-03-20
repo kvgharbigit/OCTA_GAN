@@ -1,20 +1,13 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 import numpy as np
-import h5py
 from PIL import Image
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
 
 from base import HSI_OCTA_Dataset
 from circle_crop_utils import crop_and_resize
-
-
-
-
 
 class HSI_OCTA_Dataset_Cropped(HSI_OCTA_Dataset):
     """Extension of HSI_OCTA_Dataset with circle detection and cropping."""
@@ -39,8 +32,9 @@ class HSI_OCTA_Dataset_Cropped(HSI_OCTA_Dataset):
 
         self.crop_padding = crop_padding
         self.circle_crop = circle_crop
+        print(f"Circle cropping is {'enabled' if circle_crop else 'disabled'}")
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, str]:
+    def __getitem__(self, idx: int) -> tuple:
         """Load, preprocess, and return a pair of HSI and OCTA images with circle cropping."""
         # Get file paths for the requested index
         pair = self.file_pairs[self.indices[idx]]

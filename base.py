@@ -21,9 +21,8 @@ class HSI_OCTA_Dataset(Dataset):
     """
     Dataset class for paired Hyperspectral Imaging (HSI) and Optical Coherence Tomography Angiography (OCTA) data.
 
-    This class handles loading, preprocessing, and augmentation of paired HSI and OCTA retinal images.
-    HSI data is loaded from .h5 files, with each HSI containing multiple spectral bands.
-    OCTA data is loaded from .tiff files and contains angiography information.
+    This class loads HSI and OCTA file paths directly from a CSV file, where each row contains
+    the patient ID, eye, HSI file path, and OCTA file path.
     """
 
     def __init__(self,
@@ -35,12 +34,12 @@ class HSI_OCTA_Dataset(Dataset):
                  test_ratio: float = 0.4,
                  random_seed: int = 42,
                  target_size: int = 500,
-                 approved_csv_path: str = None):  # Added approved_csv_path parameter
+                 approved_csv_path: str = None):
         """
-        Initialize the HSI-OCTA dataset.
+        Initialize the HSI-OCTA dataset using a CSV file for file paths.
 
         Args:
-            data_dir: Directory containing subdirectories with patient data
+            data_dir: Directory containing data (not used when approved_csv_path is provided)
             transform: Optional transforms to apply to loaded images
             augment: Whether to apply data augmentation
             split: Dataset split ('train', 'val', or 'test')
@@ -48,29 +47,22 @@ class HSI_OCTA_Dataset(Dataset):
             test_ratio: Fraction of data to use for testing
             random_seed: Random seed for reproducible data splitting
             target_size: Target image size for resizing
-            approved_csv_path: Path to CSV containing approved participant IDs (id_full column)
+            approved_csv_path: Path to CSV file with id_full, eye, hsi_file, octa_file columns
         """
         self.data_dir = Path(data_dir)
         self.transform = transform
         self.augment = augment
         self.split = split
         self.target_size = target_size
-
-        # Store the approved CSV path
         self.approved_csv_path = approved_csv_path
 
-        # Load approved IDs if a CSV path is provided
-        self.approved_ids = None
+        # Check if we're using CSV-based loading or directory-based loading
         if approved_csv_path:
-            self._load_approved_ids()
-
-        # Find all patient directories recursively
-        self.patient_dirs = self._find_patient_dirs(self.data_dir)
-        print(f"Found {len(self.patient_dirs)} patient directories")
-
-        # Create paired file mapping
-        self.file_pairs = self._create_file_pairs(self.patient_dirs)
-        print(f"Created {len(self.file_pairs)} HSI-OCTA file pairs")
+            # CSV-based loading
+            self._load_from_csv()
+        else:
+            # Original directory-based loading
+            self._load_from_directory()
 
         # Split dataset into train, validation, and test sets
         np.random.seed(random_seed)
@@ -98,6 +90,56 @@ class HSI_OCTA_Dataset(Dataset):
             transforms.RandomRotation(10),
             transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         ) if augment else None
+
+    def _load_from_csv(self):
+        """Load file pairs from CSV."""
+        try:
+            df = pd.read_csv(self.approved_csv_path)
+            required_columns = ['id_full', 'eye', 'hsi_file', 'octa_file']
+
+            # Check if all required columns exist
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                raise ValueError(f"CSV is missing required columns: {missing_columns}")
+
+            # Create pairs list
+            self.file_pairs = []
+            for _, row in df.iterrows():
+                # Create a unique patient identifier combining id_full and eye
+                patient_id = f"{row['id_full']}_{row['eye']}"
+
+                # Add to pairs list
+                self.file_pairs.append({
+                    'hsi': Path(row['hsi_file']),
+                    'octa': Path(row['octa_file']),
+                    'patient_id': patient_id
+                })
+
+            # For backwards compatibility with original code:
+            self.approved_ids = set(df['id_full'].astype(str).tolist())
+            self.patient_dirs = []
+
+            print(f"Loaded {len(self.file_pairs)} HSI-OCTA file pairs from CSV")
+
+        except Exception as e:
+            print(f"Error loading CSV file from {self.approved_csv_path}: {str(e)}")
+            self.file_pairs = []
+            raise
+
+    def _load_from_directory(self):
+        """Load file pairs using the original directory-based approach."""
+        # Load approved IDs if a CSV path is provided but doesn't have the required columns
+        self.approved_ids = None
+        if self.approved_csv_path:
+            self._load_approved_ids()
+
+        # Find all patient directories recursively
+        self.patient_dirs = self._find_patient_dirs(self.data_dir)
+        print(f"Found {len(self.patient_dirs)} patient directories")
+
+        # Create paired file mapping
+        self.file_pairs = self._create_file_pairs(self.patient_dirs)
+        print(f"Created {len(self.file_pairs)} HSI-OCTA file pairs")
 
     def _load_approved_ids(self):
         """Load approved participant IDs from CSV."""

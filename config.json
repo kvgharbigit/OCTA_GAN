@@ -18,7 +18,7 @@
     "data": {
         "base_dir": "Z:\\Projects\\Ophthalmic neuroscience\\Projects\\Kayvan\\OCTA_Roshan_Proj\\OCTA_GAN",
         "data_dir": "Z:\\Projects\\Ophthalmic neuroscience\\Projects\\Control Database 2024\\Kayvan_experiments\\Kayvans_Model_Dataset",
-        "approved_csv_path": "${base_dir}/approved_participants.csv",
+        "approved_csv_path": "${base_dir}\\approved_patients\\approved_participants_global.csv",
         "val_ratio": 0.1,
         "test_ratio": 0.2,
         "target_size": 500,
@@ -32,6 +32,12 @@
         "results_dir": "${base_dir}/results",
         "tensorboard_dir": "${base_dir}/tensorboard",
         "visualization_dir": "${base_dir}/visualizations"
+    },
+
+    "// Preprocessing": null,
+    "preprocessing": {
+        "circle_crop": true,
+        "crop_padding": 10
     },
 
     "// Checkpointing": null,
@@ -104,5 +110,4 @@
         "ssim_enabled": true,
         "adversarial_enabled": true
     }
-
 }
