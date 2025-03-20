@@ -8,6 +8,12 @@
     "weight_decay": 1e-4,
     "gradient_clip": 1.0,
 
+    "// Resume Training": null,
+    "resume": {
+        "enabled": false,
+        "checkpoint_path": "Z:/Projects/Ophthalmic neuroscience/Projects/Kayvan/OCTA_Roshan_Proj/OCTA_GAN/output/experiment_20250320_160527checkpoints/best_model.pth"
+    },
+
     "// Loss Weights": null,
     "lambda_pixel": 0,
     "lambda_perceptual": 0,

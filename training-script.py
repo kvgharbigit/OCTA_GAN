@@ -705,6 +705,7 @@ class Trainer:
 
         for epoch in range(start_epoch, self.config['num_epochs']):
             start_time = time.time()
+            val_loss = None
 
             # Train for one epoch
             train_g_loss, train_d_loss = self.train_epoch(epoch)
@@ -738,7 +739,8 @@ class Trainer:
                     # Convert Path objects to strings for serialization
                     serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
 
-                    save_checkpoint({
+                    # Save checkpoint data
+                    checkpoint_data = {
                         'epoch': epoch,
                         'exp_id': self.exp_id,
                         'generator_state_dict': self.generator.state_dict(),
@@ -749,13 +751,21 @@ class Trainer:
                         'config': serializable_config,
                         'circle_crop': self.use_circle_crop,
                         'metrics_history': self.metrics_history,
-                        'loss_components': self.loss_components  # Add this line
-                    }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
+                        'loss_components': self.loss_components
+                    }
 
-                    # Generate a special checkpoint as "latest_best.pth" for easy reference
-                    best_model_path = str(self.config['output']['checkpoint_dir'] / f'best_model.pth')
-                    latest_best_path = str(self.config['output']['checkpoint_dir'] / f'latest_best.pth')
-                    shutil.copy2(best_model_path, latest_best_path)
+                    # First save as best_model.pth
+                    best_model_path = str(self.config['output']['checkpoint_dir'] / 'best_model.pth')
+                    save_checkpoint(checkpoint_data, best_model_path)
+
+                    # Then save as epoch-specific version
+                    epoch_checkpoint_path = str(
+                        self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth')
+                    save_checkpoint(checkpoint_data, epoch_checkpoint_path)
+
+                    # Also save as latest_best.pth for easy reference
+                    latest_best_path = str(self.config['output']['checkpoint_dir'] / 'latest_best.pth')
+                    save_checkpoint(checkpoint_data, latest_best_path)
 
                     # Generate training summary when a new best model is saved
                     current_training_time = time.time() - self.start_time
@@ -771,6 +781,9 @@ class Trainer:
                 # Convert Path objects to strings for serialization
                 serializable_config = json.loads(json.dumps(self.config, cls=PathEncoder))
 
+                # Use the most recent val_loss if available, otherwise use best_val_loss
+                current_val_loss = val_loss if val_loss is not None else self.best_val_loss
+
                 save_checkpoint({
                     'epoch': epoch,
                     'exp_id': self.exp_id,
@@ -778,12 +791,12 @@ class Trainer:
                     'discriminator_state_dict': self.discriminator.state_dict(),
                     'optimizer_G_state_dict': self.optimizer_G.state_dict(),
                     'optimizer_D_state_dict': self.optimizer_D.state_dict(),
-                    'val_loss': val_loss,
+                    'val_loss': current_val_loss,  # Updated line
                     'config': serializable_config,
                     'circle_crop': self.use_circle_crop,
                     'metrics_history': self.metrics_history,
-                    'loss_components': self.loss_components  # Add this line
-                }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
+                    'loss_components': self.loss_components
+                }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
 
             # Check for early stopping
             if self.config['early_stopping']['enabled']:
@@ -797,10 +810,16 @@ class Trainer:
                     self.early_stop_counter = 0
 
             # Update learning rate
+            # Update learning rate
             if isinstance(self.scheduler_G, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                # For ReduceLROnPlateau, we need to provide the validation loss
-                self.scheduler_G.step(val_loss)
-                self.scheduler_D.step(val_loss)
+                # For ReduceLROnPlateau, we need validation loss
+                if val_loss is not None:
+                    self.scheduler_G.step(val_loss)
+                    self.scheduler_D.step(val_loss)
+                else:
+                    # If no validation was run this epoch, use best val loss
+                    self.scheduler_G.step(self.best_val_loss)
+                    self.scheduler_D.step(self.best_val_loss)
             else:
                 # For other schedulers like StepLR, just step without arguments
                 self.scheduler_G.step()
@@ -876,10 +895,20 @@ if __name__ == '__main__':
             print(f"SSIM loss: {trainer.config['lambda_ssim']}")
             print(f"Adversarial loss: {trainer.config['lambda_adv']}")
 
-        # Resume from checkpoint if specified
-        if args.resume:
-            print(f"Resuming training from checkpoint: {args.resume}")
-            checkpoint = torch.load(args.resume, map_location=trainer.device)
+        # Check for resume in command line args (priority) or config
+        resume_path = args.resume
+        if not resume_path:
+            # Check if resume is specified in config
+            resume_config = trainer.config.get('resume', {})
+            resume_enabled = resume_config.get('enabled', False)
+            resume_path = resume_config.get('checkpoint_path', None)
+            if not (resume_enabled and resume_path):
+                resume_path = None
+
+        # Resume training if a checkpoint path is available
+        if resume_path:
+            print(f"Resuming training from checkpoint: {resume_path}")
+            checkpoint = torch.load(resume_path, map_location=trainer.device)
             trainer.generator.load_state_dict(checkpoint['generator_state_dict'])
             trainer.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
             trainer.optimizer_G.load_state_dict(checkpoint['optimizer_G_state_dict'])
