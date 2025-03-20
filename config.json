@@ -37,7 +37,7 @@
     "// Preprocessing": null,
     "preprocessing": {
         "circle_crop": true,
-        "crop_padding": 10
+        "crop_padding": 0
     },
 
     "// Checkpointing": null,
