@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="new readme">
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="working moddle prior to toggle loss implementaiton">
+      <change beforePath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/readme.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,6 +24,7 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RESET_MODE" value="HARD" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
   &quot;lastFilter&quot;: {
@@ -29,12 +32,12 @@
     &quot;assignee&quot;: &quot;kvgharbigit&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/kvgharbigit/OCTA_GAN.git",
-    "accountId": "240bc2de-6911-42eb-a279-e6fa53e90160"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/kvgharbigit/OCTA_GAN.git&quot;,
+    &quot;accountId&quot;: &quot;240bc2de-6911-42eb-a279-e6fa53e90160&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 8
 }</component>
@@ -87,8 +90,6 @@
       <workItem from="1740716789586" duration="14715000" />
       <workItem from="1741178779699" duration="3055000" />
       <workItem from="1741503261611" duration="1895000" />
-      <workItem from="1741610006065" duration="213000" />
-      <workItem from="1741610328263" duration="15000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -194,27 +195,30 @@
       <option name="project" value="LOCAL" />
       <updated>1741579650550</updated>
     </task>
-    <task id="LOCAL-00014" summary="Added dynamic LR decay&#10;Increase  GAN loss by factor of 10 and Perceptual by Factor 50">
+    <task id="LOCAL-00014" summary="working moddle prior to toggle loss implementaiton">
       <option name="closed" value="true" />
-      <created>1741580257175</created>
+      <created>1742129363895</created>
       <option name="number" value="00014" />
       <option name="presentableId" value="LOCAL-00014" />
       <option name="project" value="LOCAL" />
-      <updated>1741580257175</updated>
+      <updated>1742129363895</updated>
     </task>
-    <task id="LOCAL-00015" summary="new readme">
-      <option name="closed" value="true" />
-      <created>1741610266044</created>
-      <option name="number" value="00015" />
-      <option name="presentableId" value="LOCAL-00015" />
-      <option name="project" value="LOCAL" />
-      <updated>1741610266044</updated>
-    </task>
-    <option name="localTasksCounter" value="16" />
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="test" />
@@ -225,8 +229,7 @@
     <MESSAGE value="commit ready for testing with real data" />
     <MESSAGE value="epoch logging, batch size, lr decay, early stopping" />
     <MESSAGE value="ReduceLRonPlateau" />
-    <MESSAGE value="Added dynamic LR decay&#10;Increase  GAN loss by factor of 10 and Perceptual by Factor 50" />
-    <MESSAGE value="new readme" />
-    <option name="LAST_COMMIT_MESSAGE" value="new readme" />
+    <MESSAGE value="working moddle prior to toggle loss implementaiton" />
+    <option name="LAST_COMMIT_MESSAGE" value="working moddle prior to toggle loss implementaiton" />
   </component>
 </project>

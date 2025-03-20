@@ -1,8 +1,8 @@
 {
     "// Training Parameters": null,
-    "num_epochs": 300,
-    "batch_size": 2,
-    "learning_rate": 0.0002,
+    "num_epochs": 200,
+    "batch_size": 3,
+    "learning_rate": 0.0001,
     "beta1": 0.5,
     "beta2": 0.999,
     "weight_decay": 1e-4,
@@ -43,10 +43,10 @@
     "type": "ReduceLROnPlateau",
     "mode": "min",
     "factor": 0.5,
-    "patience": 12,
-    "min_lr": 1e-6,
+    "patience": 10,
+    "min_lr": 1e-8,
     "verbose": true,
-    "threshold": 1e-4,
+    "threshold": 0.01,
     "cooldown": 0,
     "threshold_mode": "rel",
 
@@ -92,8 +92,17 @@
 
     "// Early Stopping": null,
     "early_stopping": {
-        "enabled": true,
-        "patience": 50,
-        "min_delta": 0.00001
+        "enabled": false,
+        "patience": 500,
+        "min_delta": 0.0001
+    },
+
+    "// Loss Settings": null,
+    "loss_components": {
+        "pixel_enabled": false,
+        "perceptual_enabled": false,
+        "ssim_enabled": true,
+        "adversarial_enabled": true
     }
+
 }

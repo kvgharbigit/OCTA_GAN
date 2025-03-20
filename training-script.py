@@ -69,6 +69,24 @@ class Trainer:
             'learning_rate': []
         }
 
+        # Set up loss component toggles from config
+        self.loss_components = {
+            'pixel_enabled': self.config.get('loss_components', {}).get('pixel_enabled', True),
+            'perceptual_enabled': self.config.get('loss_components', {}).get('perceptual_enabled', True),
+            'ssim_enabled': self.config.get('loss_components', {}).get('ssim_enabled', True),
+            'adversarial_enabled': self.config.get('loss_components', {}).get('adversarial_enabled', True)
+        }
+
+        # Print active loss components
+        print("\nActive loss components:")
+        for component, enabled in self.loss_components.items():
+            component_name = component.replace('_enabled', '')
+            print(f"  - {component_name}: {'Enabled' if enabled else 'Disabled'}")
+            if enabled:
+                weight_name = f"lambda_{component_name}"
+                if weight_name in self.config:
+                    print(f"    Weight: {self.config[weight_name]}")
+
         # Update config with circle crop option
         if 'preprocessing' not in self.config:
             self.config['preprocessing'] = {}
@@ -298,26 +316,32 @@ class Trainer:
             octa = octa.to(self.device)
 
             # Train discriminator
-            self.optimizer_D.zero_grad()
+            if self.loss_components['adversarial_enabled']:
+                self.optimizer_D.zero_grad()
 
-            real_label = torch.ones(batch_size, 1, 30, 30).to(self.device)
-            fake_label = torch.zeros(batch_size, 1, 30, 30).to(self.device)
+                real_label = torch.ones(batch_size, 1, 30, 30).to(self.device)
+                fake_label = torch.zeros(batch_size, 1, 30, 30).to(self.device)
 
-            # Generate fake image
-            fake_octa = self.generator(hsi)
+                # Generate fake image
+                fake_octa = self.generator(hsi)
 
-            # Real loss
-            real_output = self.discriminator(octa)
-            d_real_loss = self.criterion_gan(real_output, real_label)
+                # Real loss
+                real_output = self.discriminator(octa)
+                d_real_loss = self.criterion_gan(real_output, real_label)
 
-            # Fake loss
-            fake_output = self.discriminator(fake_octa.detach())
-            d_fake_loss = self.criterion_gan(fake_output, fake_label)
+                # Fake loss
+                fake_output = self.discriminator(fake_octa.detach())
+                d_fake_loss = self.criterion_gan(fake_output, fake_label)
 
-            # Combined D loss
-            d_loss = (d_real_loss + d_fake_loss) * 0.5
-            d_loss.backward()
-            self.optimizer_D.step()
+                # Combined D loss
+                d_loss = (d_real_loss + d_fake_loss) * 0.5
+                d_loss.backward()
+                self.optimizer_D.step()
+            else:
+                # Skip discriminator training if adversarial loss is disabled
+                d_loss = torch.tensor(0.0, device=self.device)
+                # Still need to generate fake OCTA for the generator training
+                fake_octa = self.generator(hsi)
 
             # Train generator
             self.optimizer_G.zero_grad()
@@ -325,16 +349,33 @@ class Trainer:
             fake_output = self.discriminator(fake_octa)
 
             # Calculate individual loss components (unweighted)
-            g_gan_loss = self.criterion_gan(fake_output, real_label)
-            g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
-            g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
-            g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+            g_gan_loss = torch.tensor(0.0, device=self.device)
+            g_pixel_loss_unweighted = torch.tensor(0.0, device=self.device)
+            g_perceptual_loss_unweighted = torch.tensor(0.0, device=self.device)
+            g_ssim_loss_unweighted = torch.tensor(0.0, device=self.device)
+
+            # Only compute enabled loss components
+            if self.loss_components['adversarial_enabled']:
+                g_gan_loss = self.criterion_gan(fake_output, real_label)
+
+            if self.loss_components['pixel_enabled']:
+                g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+
+            if self.loss_components['perceptual_enabled']:
+                g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+
+            if self.loss_components['ssim_enabled']:
+                g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
 
             # Apply weights to get the weighted loss components
-            g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
-            g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
-            g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
-            g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+            g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel'] if self.loss_components[
+                'pixel_enabled'] else torch.tensor(0.0, device=self.device)
+            g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual'] if self.loss_components[
+                'perceptual_enabled'] else torch.tensor(0.0, device=self.device)
+            g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim'] if self.loss_components[
+                'ssim_enabled'] else torch.tensor(0.0, device=self.device)
+            g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv'] if self.loss_components[
+                'adversarial_enabled'] else torch.tensor(0.0, device=self.device)
 
             # Combined G loss
             g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
@@ -348,16 +389,24 @@ class Trainer:
             # Store unweighted losses for recording
             self.epoch_losses['g_loss'].append(g_loss.item())
             self.epoch_losses['d_loss'].append(d_loss.item())
-            self.epoch_losses['gan_loss'].append(g_gan_loss.item())
-            self.epoch_losses['pixel_loss'].append(g_pixel_loss_unweighted.item())
-            self.epoch_losses['perceptual_loss'].append(g_perceptual_loss_unweighted.item())
-            self.epoch_losses['ssim_loss'].append(g_ssim_loss_unweighted.item())
+            self.epoch_losses['gan_loss'].append(
+                g_gan_loss.item() if self.loss_components['adversarial_enabled'] else 0.0)
+            self.epoch_losses['pixel_loss'].append(
+                g_pixel_loss_unweighted.item() if self.loss_components['pixel_enabled'] else 0.0)
+            self.epoch_losses['perceptual_loss'].append(
+                g_perceptual_loss_unweighted.item() if self.loss_components['perceptual_enabled'] else 0.0)
+            self.epoch_losses['ssim_loss'].append(
+                g_ssim_loss_unweighted.item() if self.loss_components['ssim_enabled'] else 0.0)
 
             # Store weighted losses for recording
-            self.epoch_losses['gan_loss_weighted'].append(g_gan_loss_weighted.item())
-            self.epoch_losses['pixel_loss_weighted'].append(g_pixel_loss.item())
-            self.epoch_losses['perceptual_loss_weighted'].append(g_perceptual_loss.item())
-            self.epoch_losses['ssim_loss_weighted'].append(g_ssim_loss.item())
+            self.epoch_losses['gan_loss_weighted'].append(
+                g_gan_loss_weighted.item() if self.loss_components['adversarial_enabled'] else 0.0)
+            self.epoch_losses['pixel_loss_weighted'].append(
+                g_pixel_loss.item() if self.loss_components['pixel_enabled'] else 0.0)
+            self.epoch_losses['perceptual_loss_weighted'].append(
+                g_perceptual_loss.item() if self.loss_components['perceptual_enabled'] else 0.0)
+            self.epoch_losses['ssim_loss_weighted'].append(
+                g_ssim_loss.item() if self.loss_components['ssim_enabled'] else 0.0)
 
             # Print interval logging (optional, for terminal feedback only)
             if i % self.config['logging']['print_interval'] == 0:
@@ -605,6 +654,18 @@ class Trainer:
             f.write(
                 f"Visual samples: {self.config['output'].get('visualization_dir', self.exp_dir / 'visual_samples')}\n\n")
 
+            # Write loss component information
+            f.write("LOSS COMPONENTS\n")
+            f.write("-" * 50 + "\n")
+            for component, enabled in self.loss_components.items():
+                component_name = component.replace('_enabled', '')
+                f.write(f"{component_name.capitalize()}: {'Enabled' if enabled else 'Disabled'}\n")
+                if enabled:
+                    weight_name = f"lambda_{component_name}"
+                    if weight_name in self.config:
+                        f.write(f"  - Weight ({weight_name}): {self.config[weight_name]}\n")
+            f.write("\n")
+
             # Write recommendations for evaluation
             if reason == "best_model" or reason == "final":
                 f.write("NEXT STEPS\n")
@@ -687,7 +748,8 @@ class Trainer:
                         'val_loss': val_loss,
                         'config': serializable_config,
                         'circle_crop': self.use_circle_crop,
-                        'metrics_history': self.metrics_history  # Save metrics history in the checkpoint
+                        'metrics_history': self.metrics_history,
+                        'loss_components': self.loss_components  # Add this line
                     }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
 
                     # Generate a special checkpoint as "latest_best.pth" for easy reference
@@ -716,11 +778,12 @@ class Trainer:
                     'discriminator_state_dict': self.discriminator.state_dict(),
                     'optimizer_G_state_dict': self.optimizer_G.state_dict(),
                     'optimizer_D_state_dict': self.optimizer_D.state_dict(),
-                    'val_loss': val_loss if epoch % self.config['validate_interval'] == 0 else None,
+                    'val_loss': val_loss,
                     'config': serializable_config,
                     'circle_crop': self.use_circle_crop,
-                    'metrics_history': self.metrics_history  # Save metrics history in the checkpoint
-                }, str(self.config['output']['checkpoint_dir'] / f'checkpoint_epoch_{epoch}.pth'))
+                    'metrics_history': self.metrics_history,
+                    'loss_components': self.loss_components  # Add this line
+                }, str(self.config['output']['checkpoint_dir'] / f'best_model.pth'))
 
             # Check for early stopping
             if self.config['early_stopping']['enabled']:
@@ -875,6 +938,16 @@ if __name__ == '__main__':
                         ])
 
                 print(f"Restored metrics CSV file from checkpoint data")
+
+            # Load loss components if available
+            if 'loss_components' in checkpoint:
+                trainer.loss_components = checkpoint['loss_components']
+                print("\nLoaded loss component settings from checkpoint:")
+                for component, enabled in trainer.loss_components.items():
+                    component_name = component.replace('_enabled', '')
+                    print(f"  - {component_name}: {'Enabled' if enabled else 'Disabled'}")
+            else:
+                print("\nNo loss component settings found in checkpoint, using defaults")
 
             # If resuming, we can use the experiment ID from the checkpoint
             if 'exp_id' in checkpoint and not args.exp_id:
