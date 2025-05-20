@@ -1,6 +1,6 @@
 '''
 # HSI to OCTA Translation Model Implementation
-
+#
 ## Architecture Overview
 ```
 Input HSI [B, 31, 500, 500]
