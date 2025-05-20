@@ -141,7 +141,7 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
                 channel = hsi_np[wavelength_indices[color]]
                 normalized = normalize_wavelength_image(channel).squeeze().cpu().numpy()
                 rgb_channels.append(normalized)
-                del channel, normalized  # Free memory
+                del channel  # Free memory but keep normalized for stacking
             
             # Stack channels, avoiding interim large tensors
             rgb_hsi = np.stack(rgb_channels)
@@ -155,19 +155,23 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             plt.imshow(rgb_hsi)
             plt.title(f"HSI Input (RGB-like)\n{patient_id}")
             plt.axis('off')
-            del rgb_hsi  # Free memory
+            # Don't delete rgb_hsi yet since matplotlib needs it for rendering
             
             plt.subplot(num_samples, 3, i*3 + 2)
             plt.imshow(fake_octa_np, cmap='gray')
             plt.title(f"Generated OCTA")
             plt.axis('off')
-            del fake_octa_np  # Free memory
+            # Keep fake_octa_np for rendering
             
             plt.subplot(num_samples, 3, i*3 + 3)
             plt.imshow(octa_np, cmap='gray')
             plt.title(f"Real OCTA")
             plt.axis('off')
-            del octa_np  # Free memory
+            # Keep octa_np for rendering
+            
+            # After the plots for this sample are set up, we can clear any CUDA cache
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             
             # Clear unneeded memory
             if torch.cuda.is_available():
@@ -178,6 +182,18 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         vis_path = output_dir / f'epoch_{epoch}_samples.png'
         plt.savefig(vis_path, bbox_inches='tight', dpi=100)  # Lower DPI
         plt.close('all')  # Close all figures to free memory
+        
+        # Clean up remaining arrays to fully free memory
+        # At this point, it's safe to delete these as the figure has been saved
+        del hsi_batch, octa_batch, patient_ids
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
+        
+        # Clear CUDA cache one final time
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         
         # Log the visualization path if log_dir is provided
         if log_dir is not None:
