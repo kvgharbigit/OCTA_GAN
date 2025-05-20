@@ -472,8 +472,10 @@ class Generator(nn.Module):
         ])
 
         # Calculate the concatenated channel sizes for reduction layers
+        # First concatenation: Output of last encoder (max_filters) + mid_filters from skip connection
         concat1_channels = max_filters + mid_filters
-        concat2_channels = max_filters + initial_filters
+        # Second concatenation: Output of first decoder (decoder_mid_filters) + initial_filters from skip connection
+        concat2_channels = decoder_mid_filters + initial_filters
 
         # Channel reduction layers after concatenation with skip connections
         # The first reduction layer output needs to match the first decoder input
@@ -528,6 +530,44 @@ class Generator(nn.Module):
             )
         ])
 
+    @staticmethod
+    def test_dimensions():
+        """
+        Test method to verify tensor dimensions through the network for all model sizes.
+        This helps catch any dimension mismatches before running the model.
+        """
+        import torch
+        print("\n===== Testing Generator Dimensions =====")
+        
+        # Test all model sizes
+        for size in ["small", "medium", "large"]:
+            print(f"\nModel size: {size}")
+            
+            # Create a dummy input tensor
+            batch_size = 2
+            spectral_channels = 31
+            height = width = 500
+            dummy_input = torch.randn(batch_size, spectral_channels, height, width)
+            
+            # Create model
+            model = Generator(spectral_channels=spectral_channels, model_size=size)
+            
+            # Enable debug mode temporarily (the forward pass will print dimensions)
+            model._debug = True
+            
+            try:
+                # Run a forward pass
+                with torch.no_grad():
+                    output = model(dummy_input)
+                print(f"✅ Success! Output shape: {output.shape}")
+            except Exception as e:
+                print(f"❌ Error: {str(e)}")
+            
+            # Disable debug mode
+            model._debug = False
+        
+        print("\n===== Dimension Test Complete =====")
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the generator.
@@ -538,31 +578,71 @@ class Generator(nn.Module):
         Returns:
             Generated OCTA tensor with shape [B, 1, 500, 500]
         """
+        # For debugging dimension issues
+        debug = getattr(self, '_debug', False)
+        
         # Input: [B, 31, 500, 500]
         skips = []
         x = x.unsqueeze(1)  # [B, 1, 31, 500, 500] - Add channel dimension for 3D conv
-
+        if debug: print(f"Input shape: {x.shape}")
+        
         # Encoder path with skip connections
         for i, enc_layer in enumerate(self.encoder):
             x = F.relu(enc_layer(x))
+            if debug: print(f"Encoder {i} output shape: {x.shape}")
+            
             if i < len(self.skip_connections):
                 skip = self.skip_connections[i](x)
                 skips.append(skip)
+                if debug: print(f"Skip connection {i} shape: {skip.shape}")
 
         # Collapse spectral dimension with max pooling
-        x = x.max(dim=2)[0]  # [B, 128, 500, 500] - Spectral dimension collapsed
+        x = x.max(dim=2)[0]  # [B, max_filters, 500, 500] - Spectral dimension collapsed
+        if debug: print(f"After max pooling shape: {x.shape}")
 
         # Decoder path with skip connections
-        for i, dec_layer in enumerate(self.decoder[:-1]):
-            if i < len(skips):
-                # Incorporate skip connection
-                skip = skips[-(i + 1)].max(dim=2)[0]  # Collapse spectral dimension
-                x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
-                x = self.reduction_layers[i](x)  # Reduce channels
-            x = dec_layer(x)
+        # First decoder layer - handle skip connection from last encoder layer
+        skip = skips[-1].max(dim=2)[0]  # Collapse spectral dimension
+        if debug: print(f"First skip connection shape after max pooling: {skip.shape}")
+        
+        # Important step: Concatenate encoder output with skip connection
+        x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
+        if debug: print(f"After first concatenation shape: {x.shape}")
+        
+        # Apply first reduction layer to match expected decoder input channels
+        x = self.reduction_layers[0](x)  # Reduce channels to max_filters
+        if debug: print(f"After first reduction shape: {x.shape}")
+        
+        # Apply first decoder layer
+        x = self.decoder[0](x)  # Output has decoder_mid_filters channels
+        if debug: print(f"After first decoder shape: {x.shape}")
+        
+        # Second decoder layer - handle skip connection from second-to-last encoder layer
+        skip = skips[-2].max(dim=2)[0]  # Collapse spectral dimension
+        if debug: print(f"Second skip connection shape after max pooling: {skip.shape}")
+        
+        # Concatenate first decoder output with second skip connection
+        x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
+        if debug: print(f"After second concatenation shape: {x.shape}")
+        
+        # Apply second reduction layer
+        x = self.reduction_layers[1](x)  # Reduce channels to decoder_mid_filters
+        if debug: print(f"After second reduction shape: {x.shape}")
+        
+        # Apply second decoder layer
+        x = self.decoder[1](x)  # Output has mid_filters channels
+        if debug: print(f"After second decoder shape: {x.shape}")
+        
+        # Remaining decoder layers (no more skip connections)
+        for i in range(2, len(self.decoder)-1):
+            x = self.decoder[i](x)
+            if debug: print(f"After decoder {i} shape: {x.shape}")
 
         # Final output layer
-        return self.decoder[-1](x)
+        output = self.decoder[-1](x)
+        if debug: print(f"Output shape: {output.shape}")
+        
+        return output
 
 
 # =====================
@@ -635,6 +715,38 @@ class Discriminator(nn.Module):
             nn.Sigmoid()  # Output in range [0, 1] - probability that patch is real
         )
 
+    @staticmethod
+    def test_dimensions():
+        """
+        Test method to verify tensor dimensions through the discriminator for all model sizes.
+        This helps catch any dimension mismatches before running the model.
+        """
+        import torch
+        print("\n===== Testing Discriminator Dimensions =====")
+        
+        # Test all model sizes
+        for size in ["small", "medium", "large"]:
+            print(f"\nModel size: {size}")
+            
+            # Create a dummy input tensor (simulating OCTA images)
+            batch_size = 2
+            channels = 1
+            height = width = 500
+            dummy_input = torch.randn(batch_size, channels, height, width)
+            
+            # Create model
+            model = Discriminator(model_size=size)
+            
+            try:
+                # Run a forward pass
+                with torch.no_grad():
+                    output = model(dummy_input)
+                print(f"✅ Success! Input shape: {dummy_input.shape}, Output shape: {output.shape}")
+            except Exception as e:
+                print(f"❌ Error: {str(e)}")
+        
+        print("\n===== Dimension Test Complete =====")
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the discriminator.
