@@ -582,31 +582,40 @@ class Generator(nn.Module):
         debug = getattr(self, '_debug', False)
         
         # Input: [B, 31, 500, 500]
-        skips = []
         x = x.unsqueeze(1)  # [B, 1, 31, 500, 500] - Add channel dimension for 3D conv
         if debug: print(f"Input shape: {x.shape}")
         
-        # Encoder path with skip connections
-        for i, enc_layer in enumerate(self.encoder):
-            x = F.relu(enc_layer(x))
-            if debug: print(f"Encoder {i} output shape: {x.shape}")
-            
-            if i < len(self.skip_connections):
-                skip = self.skip_connections[i](x)
-                skips.append(skip)
-                if debug: print(f"Skip connection {i} shape: {skip.shape}")
-
+        # Encoder path with skip connections - only store needed skip connections
+        skip1 = None
+        skip2 = None
+        
+        # First encoder layer
+        x = F.relu(self.encoder[0](x))
+        if debug: print(f"Encoder 0 output shape: {x.shape}")
+        skip1 = self.skip_connections[0](x)
+        if debug: print(f"Skip connection 0 shape: {skip1.shape}")
+        
+        # Second encoder layer
+        x = F.relu(self.encoder[1](x))
+        if debug: print(f"Encoder 1 output shape: {x.shape}")
+        skip2 = self.skip_connections[1](x)
+        if debug: print(f"Skip connection 1 shape: {skip2.shape}")
+        
+        # Third encoder layer
+        x = F.relu(self.encoder[2](x))
+        if debug: print(f"Encoder 2 output shape: {x.shape}")
+        
         # Collapse spectral dimension with max pooling
         x = x.max(dim=2)[0]  # [B, max_filters, 500, 500] - Spectral dimension collapsed
         if debug: print(f"After max pooling shape: {x.shape}")
 
         # Decoder path with skip connections
-        # First decoder layer - handle skip connection from last encoder layer
-        skip = skips[-1].max(dim=2)[0]  # Collapse spectral dimension
-        if debug: print(f"First skip connection shape after max pooling: {skip.shape}")
+        # First decoder layer - handle skip connection from encoder2
+        skip2_spatial = skip2.max(dim=2)[0]  # Collapse spectral dimension of skip2
+        if debug: print(f"First skip connection shape after max pooling: {skip2_spatial.shape}")
         
-        # Important step: Concatenate encoder output with skip connection
-        x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
+        # Memory-efficient concatenation - only create new tensor when needed
+        x = torch.cat([x, skip2_spatial], dim=1)  # Concatenate along channel dimension
         if debug: print(f"After first concatenation shape: {x.shape}")
         
         # Apply first reduction layer to match expected decoder input channels
@@ -617,12 +626,16 @@ class Generator(nn.Module):
         x = self.decoder[0](x)  # Output has decoder_mid_filters channels
         if debug: print(f"After first decoder shape: {x.shape}")
         
-        # Second decoder layer - handle skip connection from second-to-last encoder layer
-        skip = skips[-2].max(dim=2)[0]  # Collapse spectral dimension
-        if debug: print(f"Second skip connection shape after max pooling: {skip.shape}")
+        # Second decoder layer - handle skip connection from encoder1
+        skip1_spatial = skip1.max(dim=2)[0]  # Collapse spectral dimension of skip1
+        if debug: print(f"Second skip connection shape after max pooling: {skip1_spatial.shape}")
         
-        # Concatenate first decoder output with second skip connection
-        x = torch.cat([x, skip], dim=1)  # Concatenate along channel dimension
+        # Clear skip2 to free memory
+        skip2 = None
+        skip2_spatial = None
+        
+        # Memory-efficient concatenation
+        x = torch.cat([x, skip1_spatial], dim=1)  # Concatenate along channel dimension
         if debug: print(f"After second concatenation shape: {x.shape}")
         
         # Apply second reduction layer
@@ -633,6 +646,10 @@ class Generator(nn.Module):
         x = self.decoder[1](x)  # Output has mid_filters channels
         if debug: print(f"After second decoder shape: {x.shape}")
         
+        # Clear skip1 to free memory
+        skip1 = None
+        skip1_spatial = None
+        
         # Remaining decoder layers (no more skip connections)
         for i in range(2, len(self.decoder)-1):
             x = self.decoder[i](x)
@@ -641,6 +658,9 @@ class Generator(nn.Module):
         # Final output layer
         output = self.decoder[-1](x)
         if debug: print(f"Output shape: {output.shape}")
+        
+        # Explicitly free memory
+        del x
         
         return output
 

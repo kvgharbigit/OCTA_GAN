@@ -460,11 +460,15 @@ class Trainer:
         )
 
     def train_epoch(self, epoch: int):
-        """Train for one epoch."""
+        """Train for one epoch with memory optimizations."""
         self.generator.train()
         self.discriminator.train()
+        
+        # Use empty_cache at the start of each epoch to clear leftover memory
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
-        # Initialize loss tracking for this epoch
+        # Initialize loss tracking for this epoch - only track what's needed
         self.epoch_losses = {
             'g_loss': [],
             'd_loss': [],
@@ -491,70 +495,88 @@ class Trainer:
 
             # Train discriminator
             if self.loss_components['adversarial_enabled']:
-                self.optimizer_D.zero_grad()
+                self.optimizer_D.zero_grad(set_to_none=True)  # More memory efficient
 
-                real_label = torch.ones(batch_size, 1, 30, 30).to(self.device)
-                fake_label = torch.zeros(batch_size, 1, 30, 30).to(self.device)
+                # Pre-allocate labels only once and reuse
+                if not hasattr(self, 'real_label') or self.real_label.size(0) != batch_size:
+                    self.real_label = torch.ones(batch_size, 1, 30, 30, device=self.device)
+                    self.fake_label = torch.zeros(batch_size, 1, 30, 30, device=self.device)
 
                 # Generate fake image
-                fake_octa = self.generator(hsi)
+                with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):  # Mixed precision for efficiency
+                    fake_octa = self.generator(hsi)
 
-                # Real loss
-                real_output = self.discriminator(octa)
-                d_real_loss = self.criterion_gan(real_output, real_label)
+                    # Real loss
+                    real_output = self.discriminator(octa)
+                    d_real_loss = self.criterion_gan(real_output, self.real_label)
 
-                # Fake loss
-                fake_output = self.discriminator(fake_octa.detach())
-                d_fake_loss = self.criterion_gan(fake_output, fake_label)
+                    # Fake loss
+                    fake_output = self.discriminator(fake_octa.detach())  # detach to avoid gradient flow
+                    d_fake_loss = self.criterion_gan(fake_output, self.fake_label)
 
-                # Combined D loss
-                d_loss = (d_real_loss + d_fake_loss) * 0.5
+                    # Combined D loss
+                    d_loss = (d_real_loss + d_fake_loss) * 0.5
+
                 d_loss.backward()
+                
+                # Apply gradient clipping to prevent exploding gradients
+                torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=self.config['gradient_clip'])
+                
                 self.optimizer_D.step()
+                
+                # Free memory
+                del real_output, fake_output, d_real_loss, d_fake_loss
             else:
                 # Skip discriminator training if adversarial loss is disabled
                 d_loss = torch.tensor(0.0, device=self.device)
                 # Still need to generate fake OCTA for the generator training
-                fake_octa = self.generator(hsi)
+                with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
+                    fake_octa = self.generator(hsi)
 
             # Train generator
-            self.optimizer_G.zero_grad()
+            self.optimizer_G.zero_grad(set_to_none=True)  # More memory efficient
 
-            fake_output = self.discriminator(fake_octa)
+            with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
+                fake_output = self.discriminator(fake_octa)
 
-            # Calculate individual loss components (unweighted)
-            g_gan_loss = torch.tensor(0.0, device=self.device)
-            g_pixel_loss_unweighted = torch.tensor(0.0, device=self.device)
-            g_perceptual_loss_unweighted = torch.tensor(0.0, device=self.device)
-            g_ssim_loss_unweighted = torch.tensor(0.0, device=self.device)
+                # Calculate individual loss components only if enabled (memory efficient)
+                if self.loss_components['adversarial_enabled']:
+                    g_gan_loss = self.criterion_gan(fake_output, self.real_label)
+                    g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+                else:
+                    g_gan_loss = g_gan_loss_weighted = torch.tensor(0.0, device=self.device)
 
-            # Only compute enabled loss components
-            if self.loss_components['adversarial_enabled']:
-                g_gan_loss = self.criterion_gan(fake_output, real_label)
+                if self.loss_components['pixel_enabled']:
+                    g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+                    g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
+                else:
+                    g_pixel_loss_unweighted = g_pixel_loss = torch.tensor(0.0, device=self.device)
 
-            if self.loss_components['pixel_enabled']:
-                g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+                if self.loss_components['perceptual_enabled']:
+                    g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+                    g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
+                else:
+                    g_perceptual_loss_unweighted = g_perceptual_loss = torch.tensor(0.0, device=self.device)
 
-            if self.loss_components['perceptual_enabled']:
-                g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+                if self.loss_components['ssim_enabled']:
+                    g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+                    g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
+                else:
+                    g_ssim_loss_unweighted = g_ssim_loss = torch.tensor(0.0, device=self.device)
 
-            if self.loss_components['ssim_enabled']:
-                g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+                # Combined G loss
+                g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
 
-            # Apply weights to get the weighted loss components
-            g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel'] if self.loss_components[
-                'pixel_enabled'] else torch.tensor(0.0, device=self.device)
-            g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual'] if self.loss_components[
-                'perceptual_enabled'] else torch.tensor(0.0, device=self.device)
-            g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim'] if self.loss_components[
-                'ssim_enabled'] else torch.tensor(0.0, device=self.device)
-            g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv'] if self.loss_components[
-                'adversarial_enabled'] else torch.tensor(0.0, device=self.device)
-
-            # Combined G loss
-            g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
             g_loss.backward()
+            
+            # Apply gradient clipping
+            torch.nn.utils.clip_grad_norm_(self.generator.parameters(), max_norm=self.config['gradient_clip'])
+            
             self.optimizer_G.step()
+            
+            # Explicitly free memory
+            if not self.loss_components['adversarial_enabled']:
+                del fake_output
 
             # Update statistics
             total_g_loss += g_loss.item()
@@ -651,25 +673,38 @@ class Trainer:
         return avg_g_loss, avg_d_loss
 
     def validate(self, epoch: int):
-        """Run validation."""
+        """Run validation with memory optimizations."""
         self.generator.eval()
         self.discriminator.eval()
 
         total_val_loss = 0
-
-        with torch.no_grad():
+        
+        # Use torch.cuda.amp for mixed precision during validation
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
             for hsi, octa, _ in self.val_loader:
-                hsi = hsi.to(self.device)
-                octa = octa.to(self.device)
+                # Move to device just-in-time to reduce GPU memory usage
+                hsi = hsi.to(self.device, non_blocking=True)  # Non-blocking transfer
+                octa = octa.to(self.device, non_blocking=True)
 
+                # Generate fake OCTA images
                 fake_octa = self.generator(hsi)
 
-                val_pixel_loss = self.criterion_pixel(fake_octa, octa)
-                val_ssim_loss = self.criterion_ssim(fake_octa, octa)
+                # Compute validation losses (minimal computation)
+                val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
+                val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
                 val_loss = val_pixel_loss + val_ssim_loss
 
+                # Accumulate loss (convert to Python scalar to free GPU memory)
                 total_val_loss += val_loss.item()
+                
+                # Clear variables to free memory
+                del hsi, octa, fake_octa, val_loss
+                
+                # Manually trigger garbage collection if needed
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()  # Clear unused memory
 
+            # Calculate average loss
             avg_val_loss = total_val_loss / len(self.val_loader)
             
             # Log validation metrics to json/text files

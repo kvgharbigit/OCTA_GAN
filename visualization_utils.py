@@ -77,7 +77,7 @@ def normalize_wavelength_image(wavelength_image):
 
 def save_sample_visualizations(generator, val_loader, device, epoch, output_dir, log_dir=None, num_samples=3):
     """
-    Generate and save sample visualizations during training.
+    Generate and save sample visualizations during training with memory optimizations.
 
     Args:
         generator (nn.Module): The generator model
@@ -96,7 +96,8 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         log_dir = Path(log_dir)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-    with torch.no_grad():
+    # Use mixed precision for visualization generation
+    with torch.no_grad(), torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
         # Take samples from the validation loader
         hsi_batch, octa_batch, patient_ids = next(iter(val_loader))
         
@@ -107,9 +108,9 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         plt.figure(figsize=(15, 5 * num_samples))
 
         for i in range(num_samples):
-            # Get a single sample
-            hsi = hsi_batch[i:i+1].to(device)
-            octa = octa_batch[i:i+1].to(device)
+            # Get a single sample - process one at a time to save memory
+            hsi = hsi_batch[i:i+1].to(device, non_blocking=True)
+            octa = octa_batch[i:i+1].to(device, non_blocking=True)
             patient_id = patient_ids[i]
 
             # Generate fake OCTA image
@@ -120,28 +121,32 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             octa_norm = (octa + 1) / 2
             fake_octa_norm = (fake_octa + 1) / 2
 
-            # Move tensors to CPU for visualization processing
+            # Process one by one, move to CPU, and free GPU memory
             hsi_np = hsi_norm.cpu().squeeze().numpy()
+            del hsi, hsi_norm  # Free memory
+            
             octa_np = octa_norm.cpu().squeeze().numpy()
+            del octa, octa_norm  # Free memory
+            
             fake_octa_np = fake_octa_norm.cpu().squeeze().numpy()
+            del fake_octa, fake_octa_norm  # Free memory
 
             # Select representative wavelength indices
             wavelength_indices = select_representative_wavelengths()
 
-            # Create RGB-like representation of HSI
-            rgb_hsi = np.stack([
-                hsi_np[wavelength_indices['red']],  # Red channel
-                hsi_np[wavelength_indices['green']],  # Green channel
-                hsi_np[wavelength_indices['blue']]  # Blue channel
-            ])
-
-            # Normalize each channel
-            rgb_hsi = np.stack([
-                normalize_wavelength_image(rgb_hsi[0]).squeeze().cpu().numpy(),
-                normalize_wavelength_image(rgb_hsi[1]).squeeze().cpu().numpy(),
-                normalize_wavelength_image(rgb_hsi[2]).squeeze().cpu().numpy()
-            ])
-
+            # Create RGB-like representation of HSI efficiently
+            rgb_channels = []
+            for color in ['red', 'green', 'blue']:
+                # Process one channel at a time to save memory
+                channel = hsi_np[wavelength_indices[color]]
+                normalized = normalize_wavelength_image(channel).squeeze().cpu().numpy()
+                rgb_channels.append(normalized)
+                del channel, normalized  # Free memory
+            
+            # Stack channels, avoiding interim large tensors
+            rgb_hsi = np.stack(rgb_channels)
+            del rgb_channels  # Free memory
+            
             # Transpose to HWC for plotting
             rgb_hsi = np.transpose(rgb_hsi, (1, 2, 0))
             
@@ -150,22 +155,29 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             plt.imshow(rgb_hsi)
             plt.title(f"HSI Input (RGB-like)\n{patient_id}")
             plt.axis('off')
+            del rgb_hsi  # Free memory
             
             plt.subplot(num_samples, 3, i*3 + 2)
             plt.imshow(fake_octa_np, cmap='gray')
             plt.title(f"Generated OCTA")
             plt.axis('off')
+            del fake_octa_np  # Free memory
             
             plt.subplot(num_samples, 3, i*3 + 3)
             plt.imshow(octa_np, cmap='gray')
             plt.title(f"Real OCTA")
             plt.axis('off')
+            del octa_np  # Free memory
             
-        # Save the combined visualization
+            # Clear unneeded memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        # Save the combined visualization with lower DPI to save memory
         plt.tight_layout()
         vis_path = output_dir / f'epoch_{epoch}_samples.png'
-        plt.savefig(vis_path, bbox_inches='tight')
-        plt.close()
+        plt.savefig(vis_path, bbox_inches='tight', dpi=100)  # Lower DPI
+        plt.close('all')  # Close all figures to free memory
         
         # Log the visualization path if log_dir is provided
         if log_dir is not None:
