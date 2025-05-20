@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="MODULAR RESTRUCTURE">
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="MODULAR RESTRUCTURE - augs">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training-script.py" beforeDir="false" afterPath="$PROJECT_DIR$/training-script.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -90,7 +90,7 @@
       <workItem from="1740716789586" duration="14715000" />
       <workItem from="1741178779699" duration="3055000" />
       <workItem from="1741503261611" duration="1895000" />
-      <workItem from="1747722433759" duration="4883000" />
+      <workItem from="1747722433759" duration="8331000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <option name="closed" value="true" />
@@ -292,7 +292,95 @@
       <option name="project" value="LOCAL" />
       <updated>1747727113326</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="MODULAR RESTRUCTURE">
+      <option name="closed" value="true" />
+      <created>1747727367241</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1747727367241</updated>
+    </task>
+    <task id="LOCAL-00027" summary="MODULAR RESTRUCTURE - memory efficiency">
+      <option name="closed" value="true" />
+      <created>1747727648776</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1747727648776</updated>
+    </task>
+    <task id="LOCAL-00028" summary="MODULAR RESTRUCTURE - memory efficiency">
+      <option name="closed" value="true" />
+      <created>1747727743052</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1747727743052</updated>
+    </task>
+    <task id="LOCAL-00029" summary="MODULAR RESTRUCTURE - output dir namiung">
+      <option name="closed" value="true" />
+      <created>1747728067267</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1747728067267</updated>
+    </task>
+    <task id="LOCAL-00030" summary="MODULAR RESTRUCTURE - output dir namiung">
+      <option name="closed" value="true" />
+      <created>1747728146439</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1747728146439</updated>
+    </task>
+    <task id="LOCAL-00031" summary="MODULAR RESTRUCTURE - output vis">
+      <option name="closed" value="true" />
+      <created>1747728495427</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1747728495427</updated>
+    </task>
+    <task id="LOCAL-00032" summary="MODULAR RESTRUCTURE - output vis">
+      <option name="closed" value="true" />
+      <created>1747728715757</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1747728715757</updated>
+    </task>
+    <task id="LOCAL-00033" summary="MODULAR RESTRUCTURE - output vis">
+      <option name="closed" value="true" />
+      <created>1747728967839</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1747728967839</updated>
+    </task>
+    <task id="LOCAL-00034" summary="MODULAR RESTRUCTURE - output vis">
+      <option name="closed" value="true" />
+      <created>1747729339619</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1747729339619</updated>
+    </task>
+    <task id="LOCAL-00035" summary="MODULAR RESTRUCTURE - auugs">
+      <option name="closed" value="true" />
+      <created>1747729798840</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1747729798840</updated>
+    </task>
+    <task id="LOCAL-00036" summary="MODULAR RESTRUCTURE - augs">
+      <option name="closed" value="true" />
+      <created>1747730018777</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1747730018777</updated>
+    </task>
+    <option name="localTasksCounter" value="37" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -328,6 +416,11 @@
     <MESSAGE value="test mnini pipeline" />
     <MESSAGE value="WORKING PRIOR TO MODULAR RESSTRUCTURE" />
     <MESSAGE value="MODULAR RESTRUCTURE" />
-    <option name="LAST_COMMIT_MESSAGE" value="MODULAR RESTRUCTURE" />
+    <MESSAGE value="MODULAR RESTRUCTURE - memory efficiency" />
+    <MESSAGE value="MODULAR RESTRUCTURE - output dir namiung" />
+    <MESSAGE value="MODULAR RESTRUCTURE - output vis" />
+    <MESSAGE value="MODULAR RESTRUCTURE - auugs" />
+    <MESSAGE value="MODULAR RESTRUCTURE - augs" />
+    <option name="LAST_COMMIT_MESSAGE" value="MODULAR RESTRUCTURE - augs" />
   </component>
 </project>

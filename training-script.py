@@ -1082,6 +1082,9 @@ class Trainer:
         # Also create the full detailed plots from visualization_utils for reference
         # This will include the total training loss vs validation loss plot
         save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
+        
+        # Save any missing files log
+        HSI_OCTA_Dataset_Cropped.save_missing_files_log(self.log_dir)
 
         # Final cleanup
         print("\nTraining completed!")
@@ -1240,6 +1243,22 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
+        # Save missing files log
+        if hasattr(trainer, 'log_dir'):
+            output_dir = trainer.log_dir
+        else:
+            output_dir = Path(trainer.config['output']['base_dir']) / f"{trainer.exp_id}" / 'logs'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Created fallback log directory: {output_dir}")
+        HSI_OCTA_Dataset_Cropped.save_missing_files_log(output_dir)
     except Exception as e:
         print(f"\nError occurred during training: {str(e)}")
+        # Save missing files log
+        if hasattr(trainer, 'log_dir'):
+            output_dir = trainer.log_dir
+        else:
+            output_dir = Path(trainer.config['output']['base_dir']) / f"{trainer.exp_id}" / 'logs'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Created fallback log directory: {output_dir}")
+        HSI_OCTA_Dataset_Cropped.save_missing_files_log(output_dir)
         raise

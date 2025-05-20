@@ -674,6 +674,20 @@ if __name__ == "__main__":
     try:
         exp_dir, metrics_history = run_mini_test(args.config, args.num_samples, use_circle_crop)
         print(f"Mini test completed successfully! Results saved to {exp_dir}")
+        
+        # Save missing files log
+        log_dir = exp_dir / 'logs'
+        HSI_OCTA_Dataset_Cropped.save_missing_files_log(log_dir)
     except Exception as e:
         print(f"Error in mini test: {str(e)}")
+        
+        # Try to save missing files log to a fallback location
+        try:
+            config = load_config(args.config)
+            output_dir = Path(config['output']['base_dir']) / 'logs'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            HSI_OCTA_Dataset_Cropped.save_missing_files_log(output_dir)
+        except Exception as log_error:
+            print(f"Error saving missing files log: {str(log_error)}")
+        
         raise
