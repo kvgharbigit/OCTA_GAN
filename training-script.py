@@ -14,6 +14,7 @@ import argparse
 import csv
 import shutil
 import matplotlib.pyplot as plt
+import numpy as np
 
 from base import (
     Generator, Discriminator,
