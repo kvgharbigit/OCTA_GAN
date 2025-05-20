@@ -34,6 +34,10 @@ from base import (
 )
 from hsi_octa_dataset_cropped import HSI_OCTA_Dataset_Cropped
 from config_utils import load_config, setup_directories, validate_directories
+from visualization_utils import (
+    save_sample_visualizations, save_loss_plots, 
+    log_metrics, save_image_grid
+)
 
 
 def create_mini_csv(input_csv_path, output_csv_path, num_samples=10):
@@ -65,161 +69,12 @@ def create_mini_csv(input_csv_path, output_csv_path, num_samples=10):
         raise
 
 
-def save_visualizations(generator, dataloader, device, output_dir, epoch=0, num_samples=3):
-    """
-    Save sample visualizations without relying on TensorBoard.
-    
-    Args:
-        generator: Generator model
-        dataloader: Validation dataloader
-        device: Device to run inference on
-        output_dir: Directory to save visualizations
-        epoch: Current epoch number
-        num_samples: Number of samples to visualize
-    """
-    # Make sure the generator is in eval mode
-    generator.eval()
-    
-    # Create the output directory if it doesn't exist
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Get a batch of validation samples
-    hsi_batch, octa_batch, patient_ids = next(iter(dataloader))
-    
-    # Process a limited number of samples
-    n_samples = min(num_samples, len(hsi_batch))
-    
-    with torch.no_grad():
-        # Generate fake OCTA images
-        hsi_samples = hsi_batch[:n_samples].to(device)
-        octa_real = octa_batch[:n_samples].to(device)
-        patient_ids = patient_ids[:n_samples]
-        
-        # Generate fake OCTA
-        octa_fake = generator(hsi_samples)
-        
-        # Create a figure to display the results
-        plt.figure(figsize=(15, 5 * n_samples))
-        
-        for i in range(n_samples):
-            # Get the real and fake images
-            real_img = octa_real[i].cpu().detach().numpy()[0]
-            fake_img = octa_fake[i].cpu().detach().numpy()[0]
-            
-            # Denormalize if the images were normalized with mean 0.5, std 0.5
-            real_img = (real_img * 0.5) + 0.5
-            fake_img = (fake_img * 0.5) + 0.5
-            
-            # Plot real and fake images side by side
-            plt.subplot(n_samples, 2, 2*i + 1)
-            plt.imshow(real_img, cmap='gray')
-            plt.title(f"Real OCTA - {patient_ids[i]}")
-            plt.axis('off')
-            
-            plt.subplot(n_samples, 2, 2*i + 2)
-            plt.imshow(fake_img, cmap='gray')
-            plt.title(f"Generated OCTA - {patient_ids[i]}")
-            plt.axis('off')
-        
-        # Save the figure
-        plt.tight_layout()
-        plt.savefig(output_dir / f"visualization_epoch_{epoch}.png")
-        plt.close()
-        
-        print(f"Saved visualizations to {output_dir / f'visualization_epoch_{epoch}.png'}")
-    
-    # Set the generator back to training mode if needed
-    generator.train()
+# We're now using the same save_sample_visualizations function from visualization_utils.py
+# that is used in the main training pipeline
 
 
-def update_loss_plots(metrics_history, exp_dir, log_dir=None):
-    """
-    Generate and update the loss plots based on current metrics.
-    Creates two plots:
-    1. Training losses (G loss and D loss)
-    2. Validation loss (if available)
-    
-    Args:
-        metrics_history: Dictionary containing training metrics
-        exp_dir: Experiment directory path
-        log_dir: Directory to save logs (optional)
-    """
-    # Create the plots directory if it doesn't exist
-    plots_dir = Path(exp_dir) / 'plots'
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Check if we have any data to plot
-    if 'epoch' not in metrics_history or len(metrics_history['epoch']) == 0:
-        return
-    
-    # 1. Training losses plot
-    plt.figure(figsize=(12, 6))
-    epochs = metrics_history['epoch']
-    
-    # Plot generator loss
-    if 'g_loss_total' in metrics_history and len(metrics_history['g_loss_total']) > 0:
-        plt.plot(epochs, metrics_history['g_loss_total'], 'b-', label='Generator Loss')
-    
-    # Plot discriminator loss
-    if 'd_loss' in metrics_history and len(metrics_history['d_loss']) > 0:
-        plt.plot(epochs, metrics_history['d_loss'], 'r-', label='Discriminator Loss')
-    
-    # Plot validation loss on the same graph if available
-    if 'val_loss' in metrics_history and len(metrics_history['val_loss']) > 0:
-        # Make sure val_loss array is the same length as epochs
-        val_epochs = epochs[:len(metrics_history['val_loss'])]
-        plt.plot(val_epochs, metrics_history['val_loss'], 'g-', label='Validation Loss')
-    
-    plt.title('Training and Validation Losses')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    
-    # If we're in early epochs, use appropriate y-axis scaling
-    if len(epochs) < 5:
-        plt.ylim(bottom=0)  # Start y-axis at 0
-    
-    # Save the figure, overwriting any existing file
-    loss_plot_path = plots_dir / 'losses.png'
-    plt.savefig(loss_plot_path, dpi=120, bbox_inches='tight')
-    plt.close()
-    
-    # 2. Component losses plot (if we have more than one epoch)
-    if len(epochs) > 0:  # Changed from > 1 to > 0 to generate plot even with one epoch
-        plt.figure(figsize=(12, 6))
-        
-        # Only plot enabled loss components
-        component_losses = [
-            ('pixel_loss_weighted', 'Pixel Loss (L1)', 'b-'),
-            ('perceptual_loss_weighted', 'Perceptual Loss', 'r-'),
-            ('ssim_loss_weighted', 'SSIM Loss', 'g-'),
-            ('gan_loss_weighted', 'GAN Loss', 'm-')
-        ]
-        
-        for key, label, style in component_losses:
-            if key in metrics_history and any(v > 0 for v in metrics_history[key]):
-                plt.plot(epochs, metrics_history[key], style, label=label)
-        
-        plt.title('Loss Components (Weighted)')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss Value')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        # Save the components plot
-        components_plot_path = plots_dir / 'loss_components.png'
-        plt.savefig(components_plot_path, dpi=120, bbox_inches='tight')
-        plt.close()
-        
-    # Log the plot update if log_dir provided
-    if log_dir is not None:
-        log_dir = Path(log_dir)
-        log_dir.mkdir(parents=True, exist_ok=True)
-        with open(log_dir / 'plot_log.txt', 'a') as f:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"{timestamp}: Updated loss plots at epoch {epochs[-1]}\n")
+# We're now using the save_loss_plots function from visualization_utils.py
+# that is used in the main training pipeline
 
 
 def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
@@ -702,8 +557,8 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     # Update validation loss in metrics history
     metrics_history['val_loss'].append(avg_val_loss)
     
-    # Update the loss plots after validation
-    update_loss_plots(metrics_history, exp_dir, log_dir)
+    # Update the loss plots after validation using the same function as the main pipeline
+    save_loss_plots(metrics_history, exp_dir / 'plots', log_dir)
     
     # Generate sample visualizations
     print("\n" + "=" * 80)
@@ -713,13 +568,14 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     vis_dir = exp_dir / 'visual_samples'
     vis_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate and save visualizations
-    save_visualizations(
+    # Generate and save visualizations using the same function as the main pipeline
+    save_sample_visualizations(
         generator=generator,
-        dataloader=val_loader,
+        val_loader=val_loader,
         device=device,
-        output_dir=vis_dir,
         epoch=epoch,
+        output_dir=vis_dir,
+        log_dir=log_dir,
         num_samples=3
     )
     
