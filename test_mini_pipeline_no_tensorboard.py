@@ -248,13 +248,20 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         'learning_rate': []
     }
     
-    # Setup experiment name with timestamp
-    # Format: MMDD_HHMMSS (month, day, hour, minute, second)
+    # Setup experiment name with timestamp and model size
+    # Format: MMDD_HHMMSS_test_modelSize (month, day, hour, minute, second, test indicator, model size)
     timestamp = datetime.now().strftime("%m%d_%H%M%S")
-    exp_id = f"test_{timestamp}"
+    model_size = config.get('model', {}).get('size', 'medium')
+    exp_id = f"{timestamp}_test_{model_size}"
     
     # Load configuration
     config = load_config(config_path)
+    
+    # Print model size
+    model_size = config.get('model', {}).get('size', 'medium')
+    print(f"\n{'='*50}")
+    print(f"RUNNING TEST WITH MODEL SIZE: {model_size.upper()}")
+    print(f"{'='*50}\n")
     
     # Create mini dataset CSV
     original_csv_path = config.get('data', {}).get('approved_csv_path', '')
@@ -750,7 +757,8 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         f.write(f"Experiment ID: {exp_id}\n")
         f.write(f"Dataset: {config['data']['approved_csv_path']}\n")
         f.write(f"Num samples used: {num_samples}\n")
-        f.write(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}\n\n")
+        f.write(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}\n")
+        f.write(f"Model size: {config.get('model', {}).get('size', 'medium')}\n\n")
         f.write(f"Training Results:\n")
         f.write(f"- Generator Loss: {avg_g_loss:.6f}\n")
         f.write(f"- Discriminator Loss: {avg_d_loss:.6f}\n")
@@ -760,6 +768,10 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         f.write(f"- Model checkpoint: {checkpoint_path}\n")
         f.write(f"- Visualizations: {vis_dir}\n")
         f.write(f"- Loss logs: {log_dir}\n")
+    
+    # Save a copy of the config file to the experiment directory
+    with open(exp_dir / 'config.json', 'w') as f:
+        json.dump(config, f, indent=4)
     
     return exp_dir, metrics_history
 
