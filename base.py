@@ -35,7 +35,8 @@ class HSI_OCTA_Dataset(Dataset):
                  test_ratio: float = 0.4,
                  random_seed: int = 42,
                  target_size: int = 500,
-                 approved_csv_path: str = None):
+                 approved_csv_path: str = None,
+                 aug_config: dict = None):
         """
         Initialize the HSI-OCTA dataset using a CSV file for file paths.
 
@@ -85,12 +86,30 @@ class HSI_OCTA_Dataset(Dataset):
         print(f"Split '{split}' contains {len(self.indices)} samples")
 
         # Define augmentation pipeline if enabled
-        self.aug_transforms = torch.nn.Sequential(
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(30),  # Increased from 10 to 30 degrees
-            transforms.RandomAffine(degrees=0, translate=(0.2, 0.2)),  # Increased from 0.1 to 0.2 (20%)
-        ) if augment else None
+        if augment:
+            # Default values if no config is provided
+            horizontal_flip_prob = 0.5
+            vertical_flip_prob = 0.5
+            rotation_degrees = 30
+            translate_ratio = 0.2
+            
+            # Use values from config if provided
+            if aug_config:
+                horizontal_flip_prob = aug_config.get('horizontal_flip_prob', 0.5)
+                vertical_flip_prob = aug_config.get('vertical_flip_prob', 0.5)
+                rotation_degrees = aug_config.get('rotation_degrees', 30)
+                translate_ratio = aug_config.get('translate_ratio', 0.2)
+                
+            print(f"Augmentation enabled with: rotation={rotation_degrees}°, translation={translate_ratio*100}%")
+                
+            self.aug_transforms = torch.nn.Sequential(
+                transforms.RandomHorizontalFlip(p=horizontal_flip_prob),
+                transforms.RandomVerticalFlip(p=vertical_flip_prob),
+                transforms.RandomRotation(rotation_degrees),
+                transforms.RandomAffine(degrees=0, translate=(translate_ratio, translate_ratio)),
+            )
+        else:
+            self.aug_transforms = None
 
     def _load_from_csv(self):
         """Load file pairs from CSV."""

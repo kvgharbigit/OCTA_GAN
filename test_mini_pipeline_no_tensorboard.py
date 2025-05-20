@@ -293,6 +293,10 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     
     # Create datasets
     print("\nSetting up datasets...")
+    # Get augmentation config
+    aug_config = config.get('augmentation', {})
+    print(f"Augmentation enabled: {aug_config.get('enabled', True)}")
+    
     train_dataset = HSI_OCTA_Dataset_Cropped(
         data_dir=str(config['data']['data_dir']),
         approved_csv_path=config['data']['approved_csv_path'],  # Use our mini CSV
@@ -302,7 +306,9 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         val_ratio=config['data']['val_ratio'],
         test_ratio=config['data']['test_ratio'],
         crop_padding=crop_padding,
-        circle_crop=use_circle_crop
+        circle_crop=use_circle_crop,
+        augment=aug_config.get('enabled', True),  # Use enabled setting from config
+        aug_config=aug_config  # Pass full augmentation config
     )
     
     val_dataset = HSI_OCTA_Dataset_Cropped(
@@ -315,7 +321,8 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         test_ratio=config['data']['test_ratio'],
         augment=False,  # No augmentation for validation
         crop_padding=crop_padding,
-        circle_crop=use_circle_crop
+        circle_crop=use_circle_crop,
+        aug_config=aug_config  # Pass config even though augment=False (for consistency)
     )
     
     # Create dataloaders

@@ -412,6 +412,10 @@ class Trainer:
         approved_csv_path = self.config.get('data', {}).get('approved_csv_path')
         if approved_csv_path:
             print(f"Using approved participants from: {approved_csv_path}")
+            
+        # Get augmentation config
+        aug_config = self.config.get('augmentation', {})
+        print(f"Augmentation enabled: {aug_config.get('enabled', True)}")
 
         # Create datasets from the same directory with different splits
         self.train_dataset = HSI_OCTA_Dataset_Cropped(
@@ -423,7 +427,9 @@ class Trainer:
             val_ratio=self.config['data']['val_ratio'],
             test_ratio=self.config['data']['test_ratio'],
             crop_padding=crop_padding,
-            circle_crop=self.use_circle_crop
+            circle_crop=self.use_circle_crop,
+            augment=aug_config.get('enabled', True),  # Use enabled setting from config
+            aug_config=aug_config  # Pass full augmentation config
         )
 
         self.val_dataset = HSI_OCTA_Dataset_Cropped(
@@ -436,7 +442,8 @@ class Trainer:
             test_ratio=self.config['data']['test_ratio'],
             augment=False,  # No augmentation for validation
             crop_padding=crop_padding,
-            circle_crop=self.use_circle_crop
+            circle_crop=self.use_circle_crop,
+            aug_config=aug_config  # Pass config even though augment=False (for consistency)
         )
 
         print(f"Train dataset size: {len(self.train_dataset)}")

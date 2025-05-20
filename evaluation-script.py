@@ -166,6 +166,9 @@ class Evaluator:
         if approved_csv_path:
             print(f"Using approved participants from: {approved_csv_path}")
 
+        # Get augmentation config (even though we don't use augmentation for evaluation)
+        aug_config = self.config.get('augmentation', {})
+        
         # Create test dataset
         self.test_dataset = HSI_OCTA_Dataset_Cropped(
             data_dir=data_dir,
@@ -173,9 +176,10 @@ class Evaluator:
             transform=self.transform,
             split='test',
             target_size=self.config.get('data', {}).get('target_size', 500),
-            augment=False,
+            augment=False,  # No augmentation for evaluation
             crop_padding=crop_padding,
-            circle_crop=self.use_circle_crop
+            circle_crop=self.use_circle_crop,
+            aug_config=aug_config  # Pass config for consistency
         )
 
         print(f"Test dataset size: {len(self.test_dataset)} samples")
