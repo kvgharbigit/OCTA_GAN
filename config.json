@@ -85,8 +85,8 @@
         "enabled": true,
         "horizontal_flip_prob": 0.5,
         "vertical_flip_prob": 0.5,
-        "rotation_degrees": 10,
-        "translate_ratio": 0.1
+        "rotation_degrees": 30,
+        "translate_ratio": 0.2
     },
 
     "// Logging": null,

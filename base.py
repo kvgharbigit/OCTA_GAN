@@ -88,8 +88,8 @@ class HSI_OCTA_Dataset(Dataset):
         self.aug_transforms = torch.nn.Sequential(
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(10),
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+            transforms.RandomRotation(30),  # Increased from 10 to 30 degrees
+            transforms.RandomAffine(degrees=0, translate=(0.2, 0.2)),  # Increased from 0.1 to 0.2 (20%)
         ) if augment else None
 
     def _load_from_csv(self):
