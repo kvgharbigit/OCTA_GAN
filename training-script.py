@@ -61,15 +61,28 @@ class Trainer:
             'epoch': [],
             'g_loss_total': [],
             'd_loss': [],
-            'gan_loss_unweighted': [],
-            'pixel_loss_unweighted': [],
-            'perceptual_loss_unweighted': [],
-            'ssim_loss_unweighted': [],
-            'gan_loss_weighted': [],
-            'pixel_loss_weighted': [],
-            'perceptual_loss_weighted': [],
-            'ssim_loss_weighted': [],
+            'total_train_loss': [],
             'val_loss': [],
+            # Training unweighted losses
+            'pixel_loss_unweighted': [],
+            'ssim_loss_unweighted': [],
+            'perceptual_loss_unweighted': [],
+            'gan_loss_unweighted': [],
+            # Training weighted losses
+            'pixel_loss_weighted': [],
+            'ssim_loss_weighted': [],
+            'perceptual_loss_weighted': [],
+            'gan_loss_weighted': [],
+            # Validation unweighted losses
+            'val_pixel_loss_unweighted': [],
+            'val_ssim_loss_unweighted': [],
+            'val_perceptual_loss_unweighted': [],
+            'val_gan_loss_unweighted': [],
+            # Validation weighted losses
+            'val_pixel_loss_weighted': [],
+            'val_ssim_loss_weighted': [],
+            'val_perceptual_loss_weighted': [],
+            'val_gan_loss_weighted': [],
             'learning_rate': []
         }
 
@@ -246,15 +259,28 @@ class Trainer:
                 'epoch',
                 'g_loss_total',
                 'd_loss',
-                'gan_loss_unweighted',
-                'pixel_loss_unweighted',
-                'perceptual_loss_unweighted',
-                'ssim_loss_unweighted',
-                'gan_loss_weighted',
-                'pixel_loss_weighted',
-                'perceptual_loss_weighted',
-                'ssim_loss_weighted',
+                'total_train_loss',
                 'val_loss',
+                # Training unweighted losses
+                'train_pixel_loss_unweighted',
+                'train_ssim_loss_unweighted',
+                'train_perceptual_loss_unweighted',
+                'train_gan_loss_unweighted',
+                # Training weighted losses
+                'train_pixel_loss_weighted',
+                'train_ssim_loss_weighted',
+                'train_perceptual_loss_weighted',
+                'train_gan_loss_weighted',
+                # Validation unweighted losses
+                'val_pixel_loss_unweighted',
+                'val_ssim_loss_unweighted',
+                'val_perceptual_loss_unweighted',
+                'val_gan_loss_unweighted',
+                # Validation weighted losses
+                'val_pixel_loss_weighted',
+                'val_ssim_loss_weighted',
+                'val_perceptual_loss_weighted',
+                'val_gan_loss_weighted',
                 'learning_rate'
             ])
 
@@ -266,15 +292,28 @@ class Trainer:
                 metrics_dict.get('epoch', ''),
                 metrics_dict.get('g_loss_total', ''),
                 metrics_dict.get('d_loss', ''),
-                metrics_dict.get('gan_loss_unweighted', ''),
-                metrics_dict.get('pixel_loss_unweighted', ''),
-                metrics_dict.get('perceptual_loss_unweighted', ''),
-                metrics_dict.get('ssim_loss_unweighted', ''),
-                metrics_dict.get('gan_loss_weighted', ''),
-                metrics_dict.get('pixel_loss_weighted', ''),
-                metrics_dict.get('perceptual_loss_weighted', ''),
-                metrics_dict.get('ssim_loss_weighted', ''),
+                metrics_dict.get('total_train_loss', ''),
                 metrics_dict.get('val_loss', ''),
+                # Training unweighted losses
+                metrics_dict.get('pixel_loss_unweighted', ''),
+                metrics_dict.get('ssim_loss_unweighted', ''),
+                metrics_dict.get('perceptual_loss_unweighted', ''),
+                metrics_dict.get('gan_loss_unweighted', ''),
+                # Training weighted losses
+                metrics_dict.get('pixel_loss_weighted', ''),
+                metrics_dict.get('ssim_loss_weighted', ''),
+                metrics_dict.get('perceptual_loss_weighted', ''),
+                metrics_dict.get('gan_loss_weighted', ''),
+                # Validation unweighted losses
+                metrics_dict.get('val_pixel_loss_unweighted', ''),
+                metrics_dict.get('val_ssim_loss_unweighted', ''),
+                metrics_dict.get('val_perceptual_loss_unweighted', ''),
+                metrics_dict.get('val_gan_loss_unweighted', ''),
+                # Validation weighted losses
+                metrics_dict.get('val_pixel_loss_weighted', ''),
+                metrics_dict.get('val_ssim_loss_weighted', ''),
+                metrics_dict.get('val_perceptual_loss_weighted', ''),
+                metrics_dict.get('val_gan_loss_weighted', ''),
                 metrics_dict.get('learning_rate', '')
             ])
 
@@ -642,6 +681,9 @@ class Trainer:
         avg_ssim_loss_weighted = sum(self.epoch_losses['ssim_loss_weighted']) / len(
             self.epoch_losses['ssim_loss_weighted']) if self.epoch_losses['ssim_loss_weighted'] else 0
 
+        # Calculate total training loss (sum of all weighted components)
+        total_train_loss = avg_gan_loss_weighted + avg_pixel_loss_weighted + avg_perceptual_loss_weighted + avg_ssim_loss_weighted
+
         # Log metrics to json/text files
         training_metrics = {
             'g_loss_total': avg_g_loss,
@@ -654,6 +696,7 @@ class Trainer:
             'pixel_loss_weighted': avg_pixel_loss_weighted,
             'perceptual_loss_weighted': avg_perceptual_loss_weighted,
             'ssim_loss_weighted': avg_ssim_loss_weighted,
+            'total_train_loss': total_train_loss,
             'learning_rate': self.optimizer_G.param_groups[0]['lr']
         }
         
@@ -664,15 +707,28 @@ class Trainer:
             'epoch': epoch,
             'g_loss_total': avg_g_loss,
             'd_loss': avg_d_loss,
-            'gan_loss_unweighted': avg_gan_loss,
-            'pixel_loss_unweighted': avg_pixel_loss,
-            'perceptual_loss_unweighted': avg_perceptual_loss,
-            'ssim_loss_unweighted': avg_ssim_loss,
-            'gan_loss_weighted': avg_gan_loss_weighted,
-            'pixel_loss_weighted': avg_pixel_loss_weighted,
-            'perceptual_loss_weighted': avg_perceptual_loss_weighted,
-            'ssim_loss_weighted': avg_ssim_loss_weighted,
+            'total_train_loss': total_train_loss,
             'val_loss': '',  # Will be updated when validation is run
+            # Training unweighted losses
+            'pixel_loss_unweighted': avg_pixel_loss,
+            'ssim_loss_unweighted': avg_ssim_loss,
+            'perceptual_loss_unweighted': avg_perceptual_loss,
+            'gan_loss_unweighted': avg_gan_loss,
+            # Training weighted losses
+            'pixel_loss_weighted': avg_pixel_loss_weighted,
+            'ssim_loss_weighted': avg_ssim_loss_weighted,
+            'perceptual_loss_weighted': avg_perceptual_loss_weighted,
+            'gan_loss_weighted': avg_gan_loss_weighted,
+            # Validation unweighted losses (will be updated when validation is run)
+            'val_pixel_loss_unweighted': '',
+            'val_ssim_loss_unweighted': '',
+            'val_perceptual_loss_unweighted': '',
+            'val_gan_loss_unweighted': '',
+            # Validation weighted losses (will be updated when validation is run)
+            'val_pixel_loss_weighted': '',
+            'val_ssim_loss_weighted': '',
+            'val_perceptual_loss_weighted': '',
+            'val_gan_loss_weighted': '',
             'learning_rate': self.optimizer_G.param_groups[0]['lr']
         }
         self.update_csv(metrics_dict)
@@ -685,6 +741,10 @@ class Trainer:
         self.discriminator.eval()
 
         total_val_loss = 0
+        total_val_pixel_loss = 0
+        total_val_ssim_loss = 0
+        total_val_perceptual_loss = 0
+        total_val_gan_loss = 0
         
         # Standard precision (no mixed precision) like in mini test
         with torch.no_grad():
@@ -696,13 +756,37 @@ class Trainer:
                 # Generate fake OCTA images
                 fake_octa = self.generator(hsi)
 
-                # Compute validation losses (minimal computation)
+                # Compute validation losses for each component
                 val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
                 val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
-                val_loss = val_pixel_loss + val_ssim_loss
+                val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
+                
+                # Compute GAN loss if needed
+                val_gan_loss = 0
+                if self.loss_components['adversarial_enabled']:
+                    # Create real labels for validation samples
+                    batch_size = hsi.size(0)
+                    real_label = torch.ones(batch_size, 1, 30, 30, device=self.device)
+                    
+                    # Get discriminator output for fake images
+                    fake_output = self.discriminator(fake_octa)
+                    val_gan_loss = self.criterion_gan(fake_output, real_label)
+                
+                # Combine losses with the same weights used in training
+                val_pixel_loss_weighted = val_pixel_loss * self.config['lambda_pixel'] if self.loss_components['pixel_enabled'] else 0
+                val_ssim_loss_weighted = val_ssim_loss * self.config['lambda_ssim'] if self.loss_components['ssim_enabled'] else 0
+                val_perceptual_loss_weighted = val_perceptual_loss * self.config['lambda_perceptual'] if self.loss_components['perceptual_enabled'] else 0
+                val_gan_loss_weighted = val_gan_loss * self.config['lambda_adv'] if self.loss_components['adversarial_enabled'] else 0
+                
+                # Total validation loss is the sum of all weighted components
+                val_loss = val_pixel_loss_weighted + val_ssim_loss_weighted + val_perceptual_loss_weighted + val_gan_loss_weighted
 
-                # Accumulate loss (convert to Python scalar to free GPU memory)
+                # Accumulate losses (convert to Python scalar to free GPU memory)
                 total_val_loss += val_loss.item()
+                total_val_pixel_loss += val_pixel_loss.item() if isinstance(val_pixel_loss, torch.Tensor) else val_pixel_loss
+                total_val_ssim_loss += val_ssim_loss.item() if isinstance(val_ssim_loss, torch.Tensor) else val_ssim_loss
+                total_val_perceptual_loss += val_perceptual_loss.item() if isinstance(val_perceptual_loss, torch.Tensor) else val_perceptual_loss
+                total_val_gan_loss += val_gan_loss.item() if isinstance(val_gan_loss, torch.Tensor) else val_gan_loss
                 
                 # Clear variables to free memory
                 del hsi, octa, fake_octa, val_loss
@@ -711,25 +795,38 @@ class Trainer:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()  # Clear unused memory
 
-            # Calculate average loss
+            # Calculate average losses
             avg_val_loss = total_val_loss / len(self.val_loader)
+            avg_val_pixel_loss = total_val_pixel_loss / len(self.val_loader)
+            avg_val_ssim_loss = total_val_ssim_loss / len(self.val_loader)
+            avg_val_perceptual_loss = total_val_perceptual_loss / len(self.val_loader)
+            avg_val_gan_loss = total_val_gan_loss / len(self.val_loader)
             
             # Log validation metrics to json/text files
             validation_metrics = {
-                'val_loss': avg_val_loss
+                'val_loss': avg_val_loss,
+                'val_pixel_loss_unweighted': avg_val_pixel_loss,
+                'val_ssim_loss_unweighted': avg_val_ssim_loss,
+                'val_perceptual_loss_unweighted': avg_val_perceptual_loss,
+                'val_gan_loss_unweighted': avg_val_gan_loss,
+                'val_pixel_loss_weighted': avg_val_pixel_loss * self.config['lambda_pixel'] if self.loss_components['pixel_enabled'] else 0,
+                'val_ssim_loss_weighted': avg_val_ssim_loss * self.config['lambda_ssim'] if self.loss_components['ssim_enabled'] else 0,
+                'val_perceptual_loss_weighted': avg_val_perceptual_loss * self.config['lambda_perceptual'] if self.loss_components['perceptual_enabled'] else 0,
+                'val_gan_loss_weighted': avg_val_gan_loss * self.config['lambda_adv'] if self.loss_components['adversarial_enabled'] else 0
             }
             log_metrics(validation_metrics, self.log_dir, epoch, is_training=False)
 
-            # Ensure val_loss list is populated correctly
-            if 'val_loss' not in self.metrics_history:
-                self.metrics_history['val_loss'] = []
-
-            # If the list is shorter than expected, append the value instead of updating
-            if len(self.metrics_history['val_loss']) < len(self.metrics_history['epoch']):
-                self.metrics_history['val_loss'].append(avg_val_loss)
-            else:
-                # Otherwise update the last element
-                self.metrics_history['val_loss'][-1] = avg_val_loss
+            # Update metrics history
+            for key, value in validation_metrics.items():
+                if key not in self.metrics_history:
+                    self.metrics_history[key] = []
+                
+                # If the list is shorter than expected, append the value instead of updating
+                if len(self.metrics_history[key]) < len(self.metrics_history['epoch']):
+                    self.metrics_history[key].append(value)
+                else:
+                    # Otherwise update the last element
+                    self.metrics_history[key][-1] = value
 
             # Update the CSV file
             with open(self.csv_path, 'r') as csvfile:
@@ -738,7 +835,25 @@ class Trainer:
             # Find the row for the current epoch (should be the last row)
             for i in range(len(rows) - 1, 0, -1):
                 if rows[i][0] == str(epoch):
-                    rows[i][11] = str(avg_val_loss)  # Update validation loss column
+                    # Update validation metrics columns - note the column indices are based on the new CSV structure
+                    rows[i][4] = str(avg_val_loss)  # Total val loss
+                    
+                    # Validation unweighted losses
+                    rows[i][13] = str(avg_val_pixel_loss)  # Unweighted val pixel loss
+                    rows[i][14] = str(avg_val_ssim_loss)  # Unweighted val SSIM loss
+                    rows[i][15] = str(avg_val_perceptual_loss)  # Unweighted val perceptual loss
+                    rows[i][16] = str(avg_val_gan_loss)  # Unweighted val GAN loss
+                    
+                    # Validation weighted losses
+                    val_pixel_loss_weighted = avg_val_pixel_loss * self.config['lambda_pixel'] if self.loss_components['pixel_enabled'] else 0
+                    val_ssim_loss_weighted = avg_val_ssim_loss * self.config['lambda_ssim'] if self.loss_components['ssim_enabled'] else 0
+                    val_perceptual_loss_weighted = avg_val_perceptual_loss * self.config['lambda_perceptual'] if self.loss_components['perceptual_enabled'] else 0
+                    val_gan_loss_weighted = avg_val_gan_loss * self.config['lambda_adv'] if self.loss_components['adversarial_enabled'] else 0
+                    
+                    rows[i][17] = str(val_pixel_loss_weighted)  # Weighted val pixel loss
+                    rows[i][18] = str(val_ssim_loss_weighted)  # Weighted val SSIM loss
+                    rows[i][19] = str(val_perceptual_loss_weighted)  # Weighted val perceptual loss
+                    rows[i][20] = str(val_gan_loss_weighted)  # Weighted val GAN loss
                     break
 
             # Write the updated rows back to the CSV file
@@ -1178,35 +1293,127 @@ if __name__ == '__main__':
                         'epoch',
                         'g_loss_total',
                         'd_loss',
-                        'gan_loss_unweighted',
-                        'pixel_loss_unweighted',
-                        'perceptual_loss_unweighted',
-                        'ssim_loss_unweighted',
-                        'gan_loss_weighted',
-                        'pixel_loss_weighted',
-                        'perceptual_loss_weighted',
-                        'ssim_loss_weighted',
+                        'total_train_loss',
                         'val_loss',
+                        # Training unweighted losses
+                        'pixel_loss_unweighted',
+                        'ssim_loss_unweighted',
+                        'perceptual_loss_unweighted',
+                        'gan_loss_unweighted',
+                        # Training weighted losses
+                        'pixel_loss_weighted',
+                        'ssim_loss_weighted',
+                        'perceptual_loss_weighted',
+                        'gan_loss_weighted',
+                        # Validation unweighted losses
+                        'val_pixel_loss_unweighted',
+                        'val_ssim_loss_unweighted',
+                        'val_perceptual_loss_unweighted',
+                        'val_gan_loss_unweighted',
+                        # Validation weighted losses
+                        'val_pixel_loss_weighted',
+                        'val_ssim_loss_weighted',
+                        'val_perceptual_loss_weighted',
+                        'val_gan_loss_weighted',
                         'learning_rate'
                     ])
 
                     # Write data for each epoch
                     for i in range(len(trainer.metrics_history['epoch'])):
+                        # Get total training loss (compute if not available)
+                        if 'total_train_loss' in trainer.metrics_history and i < len(trainer.metrics_history['total_train_loss']):
+                            total_train_loss = trainer.metrics_history['total_train_loss'][i]
+                        else:
+                            # Calculate from component losses if available
+                            total_train_loss = 0
+                            if 'gan_loss_weighted' in trainer.metrics_history and i < len(trainer.metrics_history['gan_loss_weighted']):
+                                total_train_loss += trainer.metrics_history['gan_loss_weighted'][i]
+                            if 'pixel_loss_weighted' in trainer.metrics_history and i < len(trainer.metrics_history['pixel_loss_weighted']):
+                                total_train_loss += trainer.metrics_history['pixel_loss_weighted'][i]
+                            if 'perceptual_loss_weighted' in trainer.metrics_history and i < len(trainer.metrics_history['perceptual_loss_weighted']):
+                                total_train_loss += trainer.metrics_history['perceptual_loss_weighted'][i]
+                            if 'ssim_loss_weighted' in trainer.metrics_history and i < len(trainer.metrics_history['ssim_loss_weighted']):
+                                total_train_loss += trainer.metrics_history['ssim_loss_weighted'][i]
+                        
+                        # Helper function to safely get values from metrics history
+                        def get_metric(key, default=''):
+                            if key in trainer.metrics_history and i < len(trainer.metrics_history[key]):
+                                return trainer.metrics_history[key][i]
+                            return default
+                        
+                        # Handle possible key naming differences in old checkpoints
+                        val_pixel_loss_unweighted = get_metric('val_pixel_loss_unweighted')
+                        if val_pixel_loss_unweighted == '' and 'val_pixel_loss' in trainer.metrics_history and i < len(trainer.metrics_history['val_pixel_loss']):
+                            val_pixel_loss_unweighted = trainer.metrics_history['val_pixel_loss'][i]
+                        
+                        val_ssim_loss_unweighted = get_metric('val_ssim_loss_unweighted')
+                        if val_ssim_loss_unweighted == '' and 'val_ssim_loss' in trainer.metrics_history and i < len(trainer.metrics_history['val_ssim_loss']):
+                            val_ssim_loss_unweighted = trainer.metrics_history['val_ssim_loss'][i]
+                            
+                        val_perceptual_loss_unweighted = get_metric('val_perceptual_loss_unweighted')
+                        if val_perceptual_loss_unweighted == '' and 'val_perceptual_loss' in trainer.metrics_history and i < len(trainer.metrics_history['val_perceptual_loss']):
+                            val_perceptual_loss_unweighted = trainer.metrics_history['val_perceptual_loss'][i]
+                            
+                        val_gan_loss_unweighted = get_metric('val_gan_loss_unweighted')
+                        if val_gan_loss_unweighted == '' and 'val_gan_loss' in trainer.metrics_history and i < len(trainer.metrics_history['val_gan_loss']):
+                            val_gan_loss_unweighted = trainer.metrics_history['val_gan_loss'][i]
+                        
+                        # Calculate weighted validation losses if they're not already in history
+                        val_pixel_loss_weighted = get_metric('val_pixel_loss_weighted')
+                        if val_pixel_loss_weighted == '' and val_pixel_loss_unweighted != '':
+                            try:
+                                val_pixel_loss_weighted = float(val_pixel_loss_unweighted) * trainer.config['lambda_pixel'] if trainer.loss_components['pixel_enabled'] else 0
+                            except:
+                                val_pixel_loss_weighted = ''
+                        
+                        val_ssim_loss_weighted = get_metric('val_ssim_loss_weighted')
+                        if val_ssim_loss_weighted == '' and val_ssim_loss_unweighted != '':
+                            try:
+                                val_ssim_loss_weighted = float(val_ssim_loss_unweighted) * trainer.config['lambda_ssim'] if trainer.loss_components['ssim_enabled'] else 0
+                            except:
+                                val_ssim_loss_weighted = ''
+                                
+                        val_perceptual_loss_weighted = get_metric('val_perceptual_loss_weighted')
+                        if val_perceptual_loss_weighted == '' and val_perceptual_loss_unweighted != '':
+                            try:
+                                val_perceptual_loss_weighted = float(val_perceptual_loss_unweighted) * trainer.config['lambda_perceptual'] if trainer.loss_components['perceptual_enabled'] else 0
+                            except:
+                                val_perceptual_loss_weighted = ''
+                                
+                        val_gan_loss_weighted = get_metric('val_gan_loss_weighted')
+                        if val_gan_loss_weighted == '' and val_gan_loss_unweighted != '':
+                            try:
+                                val_gan_loss_weighted = float(val_gan_loss_unweighted) * trainer.config['lambda_adv'] if trainer.loss_components['adversarial_enabled'] else 0
+                            except:
+                                val_gan_loss_weighted = ''
+                        
                         writer.writerow([
-                            trainer.metrics_history['epoch'][i],
-                            trainer.metrics_history['g_loss_total'][i],
-                            trainer.metrics_history['d_loss'][i],
-                            trainer.metrics_history['gan_loss_unweighted'][i],
-                            trainer.metrics_history['pixel_loss_unweighted'][i],
-                            trainer.metrics_history['perceptual_loss_unweighted'][i],
-                            trainer.metrics_history['ssim_loss_unweighted'][i],
-                            trainer.metrics_history['gan_loss_weighted'][i],
-                            trainer.metrics_history['pixel_loss_weighted'][i],
-                            trainer.metrics_history['perceptual_loss_weighted'][i],
-                            trainer.metrics_history['ssim_loss_weighted'][i],
-                            trainer.metrics_history['val_loss'][i] if i < len(
-                                trainer.metrics_history['val_loss']) else '',
-                            trainer.metrics_history['learning_rate'][i]
+                            get_metric('epoch'),
+                            get_metric('g_loss_total'),
+                            get_metric('d_loss'),
+                            total_train_loss,
+                            get_metric('val_loss'),
+                            # Training unweighted losses
+                            get_metric('pixel_loss_unweighted'),
+                            get_metric('ssim_loss_unweighted'),
+                            get_metric('perceptual_loss_unweighted'),
+                            get_metric('gan_loss_unweighted'),
+                            # Training weighted losses
+                            get_metric('pixel_loss_weighted'),
+                            get_metric('ssim_loss_weighted'),
+                            get_metric('perceptual_loss_weighted'),
+                            get_metric('gan_loss_weighted'),
+                            # Validation unweighted losses
+                            val_pixel_loss_unweighted,
+                            val_ssim_loss_unweighted,
+                            val_perceptual_loss_unweighted,
+                            val_gan_loss_unweighted,
+                            # Validation weighted losses
+                            val_pixel_loss_weighted,
+                            val_ssim_loss_weighted,
+                            val_perceptual_loss_weighted,
+                            val_gan_loss_weighted,
+                            get_metric('learning_rate')
                         ])
 
                 print(f"Restored metrics CSV file from checkpoint data")

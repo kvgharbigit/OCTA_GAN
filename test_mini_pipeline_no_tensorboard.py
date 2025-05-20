@@ -18,6 +18,7 @@ import torchvision.transforms as transforms
 from pathlib import Path
 import time
 from tqdm import tqdm
+import numpy as np
 from datetime import datetime
 import argparse
 import csv
@@ -100,15 +101,28 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         'epoch': [],
         'g_loss_total': [],
         'd_loss': [],
-        'gan_loss_unweighted': [],
-        'pixel_loss_unweighted': [],
-        'perceptual_loss_unweighted': [],
-        'ssim_loss_unweighted': [],
-        'gan_loss_weighted': [],
-        'pixel_loss_weighted': [],
-        'perceptual_loss_weighted': [],
-        'ssim_loss_weighted': [],
+        'total_train_loss': [],
         'val_loss': [],
+        # Training unweighted losses
+        'pixel_loss_unweighted': [],
+        'ssim_loss_unweighted': [],
+        'perceptual_loss_unweighted': [],
+        'gan_loss_unweighted': [],
+        # Training weighted losses
+        'pixel_loss_weighted': [],
+        'ssim_loss_weighted': [],
+        'perceptual_loss_weighted': [],
+        'gan_loss_weighted': [],
+        # Validation unweighted losses
+        'val_pixel_loss_unweighted': [],
+        'val_ssim_loss_unweighted': [],
+        'val_perceptual_loss_unweighted': [],
+        'val_gan_loss_unweighted': [],
+        # Validation weighted losses
+        'val_pixel_loss_weighted': [],
+        'val_ssim_loss_weighted': [],
+        'val_perceptual_loss_weighted': [],
+        'val_gan_loss_weighted': [],
         'learning_rate': []
     }
     
@@ -276,15 +290,28 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
             'epoch',
             'g_loss_total',
             'd_loss',
-            'gan_loss_unweighted',
-            'pixel_loss_unweighted',
-            'perceptual_loss_unweighted',
-            'ssim_loss_unweighted',
-            'gan_loss_weighted',
-            'pixel_loss_weighted',
-            'perceptual_loss_weighted',
-            'ssim_loss_weighted',
+            'total_train_loss',
             'val_loss',
+            # Training unweighted losses
+            'pixel_loss_unweighted',
+            'ssim_loss_unweighted',
+            'perceptual_loss_unweighted',
+            'gan_loss_unweighted',
+            # Training weighted losses
+            'pixel_loss_weighted',
+            'ssim_loss_weighted',
+            'perceptual_loss_weighted',
+            'gan_loss_weighted',
+            # Validation unweighted losses
+            'val_pixel_loss_unweighted',
+            'val_ssim_loss_unweighted',
+            'val_perceptual_loss_unweighted',
+            'val_gan_loss_unweighted',
+            # Validation weighted losses
+            'val_pixel_loss_weighted',
+            'val_ssim_loss_weighted',
+            'val_perceptual_loss_weighted',
+            'val_gan_loss_weighted',
             'learning_rate'
         ])
     
@@ -529,6 +556,10 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     discriminator.eval()
     
     total_val_loss = 0
+    total_val_pixel_loss = 0
+    total_val_ssim_loss = 0
+    total_val_perceptual_loss = 0
+    total_val_gan_loss = 0
     
     with torch.no_grad():
         for hsi, octa, _ in tqdm(val_loader, desc="Validation"):
@@ -537,17 +568,65 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
             
             fake_octa = generator(hsi)
             
-            val_pixel_loss = criterion_pixel(fake_octa, octa)
-            val_ssim_loss = criterion_ssim(fake_octa, octa)
-            val_loss = val_pixel_loss + val_ssim_loss
+            # Compute validation losses for each component
+            val_pixel_loss = criterion_pixel(fake_octa, octa) if loss_components['pixel_enabled'] else 0
+            val_ssim_loss = criterion_ssim(fake_octa, octa) if loss_components['ssim_enabled'] else 0
+            val_perceptual_loss = criterion_perceptual(fake_octa, octa) if loss_components['perceptual_enabled'] else 0
             
+            # Compute GAN loss if needed
+            val_gan_loss = 0
+            if loss_components['adversarial_enabled']:
+                # Create real labels for validation samples
+                batch_size = hsi.size(0)
+                real_label = torch.ones(batch_size, 1, 30, 30, device=device)
+                
+                # Get discriminator output for fake images
+                fake_output = discriminator(fake_octa)
+                val_gan_loss = criterion_gan(fake_output, real_label)
+            
+            # Combine losses with the same weights used in training
+            val_pixel_loss_weighted = val_pixel_loss * config['lambda_pixel'] if loss_components['pixel_enabled'] else 0
+            val_ssim_loss_weighted = val_ssim_loss * config['lambda_ssim'] if loss_components['ssim_enabled'] else 0
+            val_perceptual_loss_weighted = val_perceptual_loss * config['lambda_perceptual'] if loss_components['perceptual_enabled'] else 0
+            val_gan_loss_weighted = val_gan_loss * config['lambda_adv'] if loss_components['adversarial_enabled'] else 0
+            
+            # Total validation loss is the sum of all weighted components
+            val_loss = val_pixel_loss_weighted + val_ssim_loss_weighted + val_perceptual_loss_weighted + val_gan_loss_weighted
+            
+            # Accumulate losses
             total_val_loss += val_loss.item()
+            total_val_pixel_loss += val_pixel_loss.item() if isinstance(val_pixel_loss, torch.Tensor) else val_pixel_loss
+            total_val_ssim_loss += val_ssim_loss.item() if isinstance(val_ssim_loss, torch.Tensor) else val_ssim_loss
+            total_val_perceptual_loss += val_perceptual_loss.item() if isinstance(val_perceptual_loss, torch.Tensor) else val_perceptual_loss
+            total_val_gan_loss += val_gan_loss.item() if isinstance(val_gan_loss, torch.Tensor) else val_gan_loss
     
+    # Calculate average losses
     avg_val_loss = total_val_loss / len(val_loader)
+    avg_val_pixel_loss = total_val_pixel_loss / len(val_loader)
+    avg_val_ssim_loss = total_val_ssim_loss / len(val_loader)
+    avg_val_perceptual_loss = total_val_perceptual_loss / len(val_loader)
+    avg_val_gan_loss = total_val_gan_loss / len(val_loader)
+    
+    # Calculate weighted validation losses
+    avg_val_pixel_loss_weighted = avg_val_pixel_loss * config['lambda_pixel'] if loss_components['pixel_enabled'] else 0
+    avg_val_ssim_loss_weighted = avg_val_ssim_loss * config['lambda_ssim'] if loss_components['ssim_enabled'] else 0
+    avg_val_perceptual_loss_weighted = avg_val_perceptual_loss * config['lambda_perceptual'] if loss_components['perceptual_enabled'] else 0
+    avg_val_gan_loss_weighted = avg_val_gan_loss * config['lambda_adv'] if loss_components['adversarial_enabled'] else 0
     
     # Log validation loss to a file
     with open(log_dir / 'validation_log.txt', 'w') as f:
         f.write(f"Validation Epoch {epoch} Loss: {avg_val_loss:.6f}\n")
+        f.write(f"Validation Pixel Loss (unweighted): {avg_val_pixel_loss:.6f}\n")
+        f.write(f"Validation SSIM Loss (unweighted): {avg_val_ssim_loss:.6f}\n")
+        f.write(f"Validation Perceptual Loss (unweighted): {avg_val_perceptual_loss:.6f}\n")
+        f.write(f"Validation GAN Loss (unweighted): {avg_val_gan_loss:.6f}\n")
+        f.write(f"Validation Pixel Loss (weighted): {avg_val_pixel_loss_weighted:.6f}\n")
+        f.write(f"Validation SSIM Loss (weighted): {avg_val_ssim_loss_weighted:.6f}\n")
+        f.write(f"Validation Perceptual Loss (weighted): {avg_val_perceptual_loss_weighted:.6f}\n")
+        f.write(f"Validation GAN Loss (weighted): {avg_val_gan_loss_weighted:.6f}\n")
+    
+    # Calculate total training loss (sum of all weighted components)
+    total_train_loss = avg_gan_loss_weighted + avg_pixel_loss_weighted + avg_perceptual_loss_weighted + avg_ssim_loss_weighted
     
     # Update the CSV with metrics
     with open(csv_path, 'a', newline='') as csvfile:
@@ -556,22 +635,44 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
             epoch,
             avg_g_loss,
             avg_d_loss,
-            avg_gan_loss,
-            avg_pixel_loss,
-            avg_perceptual_loss,
-            avg_ssim_loss,
-            avg_gan_loss_weighted,
-            avg_pixel_loss_weighted,
-            avg_perceptual_loss_weighted,
-            avg_ssim_loss_weighted,
+            total_train_loss,
             avg_val_loss,
+            # Training unweighted losses
+            avg_pixel_loss,
+            avg_ssim_loss,
+            avg_perceptual_loss,
+            avg_gan_loss,
+            # Training weighted losses
+            avg_pixel_loss_weighted,
+            avg_ssim_loss_weighted,
+            avg_perceptual_loss_weighted,
+            avg_gan_loss_weighted,
+            # Validation unweighted losses
+            avg_val_pixel_loss,
+            avg_val_ssim_loss,
+            avg_val_perceptual_loss,
+            avg_val_gan_loss,
+            # Validation weighted losses
+            avg_val_pixel_loss_weighted,
+            avg_val_ssim_loss_weighted,
+            avg_val_perceptual_loss_weighted,
+            avg_val_gan_loss_weighted,
             optimizer_G.param_groups[0]['lr']
         ])
     
     print(f'Validation Loss: {avg_val_loss:.4f}')
     
-    # Update validation loss in metrics history
+    # Update metrics history with all validation metrics
+    metrics_history['total_train_loss'].append(total_train_loss)
     metrics_history['val_loss'].append(avg_val_loss)
+    metrics_history['val_pixel_loss_unweighted'].append(avg_val_pixel_loss)
+    metrics_history['val_ssim_loss_unweighted'].append(avg_val_ssim_loss)
+    metrics_history['val_perceptual_loss_unweighted'].append(avg_val_perceptual_loss)
+    metrics_history['val_gan_loss_unweighted'].append(avg_val_gan_loss)
+    metrics_history['val_pixel_loss_weighted'].append(avg_val_pixel_loss_weighted)
+    metrics_history['val_ssim_loss_weighted'].append(avg_val_ssim_loss_weighted)
+    metrics_history['val_perceptual_loss_weighted'].append(avg_val_perceptual_loss_weighted)
+    metrics_history['val_gan_loss_weighted'].append(avg_val_gan_loss_weighted)
     
     # Update the loss plots after validation using the same function as the main pipeline
     save_loss_plots(metrics_history, exp_dir / 'plots', log_dir)

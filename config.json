@@ -15,10 +15,10 @@
     },
 
     "// Loss Weights": null,
-    "lambda_pixel": 5,
+    "lambda_pixel": 2,
     "lambda_perceptual": 0,
-    "lambda_ssim": 10,
-    "lambda_adv": 1,
+    "lambda_ssim": 2,
+    "lambda_adv": 5,
 
     "// Data Parameters": null,
     "data": {
