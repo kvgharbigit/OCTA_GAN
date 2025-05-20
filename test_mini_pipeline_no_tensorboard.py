@@ -133,6 +133,95 @@ def save_visualizations(generator, dataloader, device, output_dir, epoch=0, num_
     generator.train()
 
 
+def update_loss_plots(metrics_history, exp_dir, log_dir=None):
+    """
+    Generate and update the loss plots based on current metrics.
+    Creates two plots:
+    1. Training losses (G loss and D loss)
+    2. Validation loss (if available)
+    
+    Args:
+        metrics_history: Dictionary containing training metrics
+        exp_dir: Experiment directory path
+        log_dir: Directory to save logs (optional)
+    """
+    # Create the plots directory if it doesn't exist
+    plots_dir = Path(exp_dir) / 'plots'
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check if we have any data to plot
+    if 'epoch' not in metrics_history or len(metrics_history['epoch']) == 0:
+        return
+    
+    # 1. Training losses plot
+    plt.figure(figsize=(12, 6))
+    epochs = metrics_history['epoch']
+    
+    # Plot generator loss
+    if 'g_loss_total' in metrics_history and len(metrics_history['g_loss_total']) > 0:
+        plt.plot(epochs, metrics_history['g_loss_total'], 'b-', label='Generator Loss')
+    
+    # Plot discriminator loss
+    if 'd_loss' in metrics_history and len(metrics_history['d_loss']) > 0:
+        plt.plot(epochs, metrics_history['d_loss'], 'r-', label='Discriminator Loss')
+    
+    # Plot validation loss on the same graph if available
+    if 'val_loss' in metrics_history and len(metrics_history['val_loss']) > 0:
+        # Make sure val_loss array is the same length as epochs
+        val_epochs = epochs[:len(metrics_history['val_loss'])]
+        plt.plot(val_epochs, metrics_history['val_loss'], 'g-', label='Validation Loss')
+    
+    plt.title('Training and Validation Losses')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # If we're in early epochs, use appropriate y-axis scaling
+    if len(epochs) < 5:
+        plt.ylim(bottom=0)  # Start y-axis at 0
+    
+    # Save the figure, overwriting any existing file
+    loss_plot_path = plots_dir / 'losses.png'
+    plt.savefig(loss_plot_path, dpi=120, bbox_inches='tight')
+    plt.close()
+    
+    # 2. Component losses plot (if we have more than one epoch)
+    if len(epochs) > 0:  # Changed from > 1 to > 0 to generate plot even with one epoch
+        plt.figure(figsize=(12, 6))
+        
+        # Only plot enabled loss components
+        component_losses = [
+            ('pixel_loss_weighted', 'Pixel Loss (L1)', 'b-'),
+            ('perceptual_loss_weighted', 'Perceptual Loss', 'r-'),
+            ('ssim_loss_weighted', 'SSIM Loss', 'g-'),
+            ('gan_loss_weighted', 'GAN Loss', 'm-')
+        ]
+        
+        for key, label, style in component_losses:
+            if key in metrics_history and any(v > 0 for v in metrics_history[key]):
+                plt.plot(epochs, metrics_history[key], style, label=label)
+        
+        plt.title('Loss Components (Weighted)')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss Value')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # Save the components plot
+        components_plot_path = plots_dir / 'loss_components.png'
+        plt.savefig(components_plot_path, dpi=120, bbox_inches='tight')
+        plt.close()
+        
+    # Log the plot update if log_dir provided
+    if log_dir is not None:
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with open(log_dir / 'plot_log.txt', 'a') as f:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{timestamp}: Updated loss plots at epoch {epochs[-1]}\n")
+
+
 def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     """
     Run a mini test of the training pipeline with a small subset of data.
@@ -142,6 +231,23 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         num_samples: Number of samples to include in the mini test
         use_circle_crop: Whether to use circle cropping
     """
+    # Initialize metrics history dictionary to track all losses
+    metrics_history = {
+        'epoch': [],
+        'g_loss_total': [],
+        'd_loss': [],
+        'gan_loss_unweighted': [],
+        'pixel_loss_unweighted': [],
+        'perceptual_loss_unweighted': [],
+        'ssim_loss_unweighted': [],
+        'gan_loss_weighted': [],
+        'pixel_loss_weighted': [],
+        'perceptual_loss_weighted': [],
+        'ssim_loss_weighted': [],
+        'val_loss': [],
+        'learning_rate': []
+    }
+    
     # Setup experiment name with timestamp
     # Format: MMDD_HHMMSS (month, day, hour, minute, second)
     timestamp = datetime.now().strftime("%m%d_%H%M%S")
@@ -498,6 +604,24 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     avg_perceptual_loss_weighted = sum(epoch_losses['perceptual_loss_weighted']) / len(epoch_losses['perceptual_loss_weighted']) if epoch_losses['perceptual_loss_weighted'] else 0
     avg_ssim_loss_weighted = sum(epoch_losses['ssim_loss_weighted']) / len(epoch_losses['ssim_loss_weighted']) if epoch_losses['ssim_loss_weighted'] else 0
     
+    # Update the metrics history for tracking
+    # Add current epoch metrics
+    metrics_history['epoch'].append(epoch)
+    metrics_history['g_loss_total'].append(avg_g_loss)
+    metrics_history['d_loss'].append(avg_d_loss)
+    metrics_history['gan_loss_unweighted'].append(avg_gan_loss)
+    metrics_history['pixel_loss_unweighted'].append(avg_pixel_loss)
+    metrics_history['perceptual_loss_unweighted'].append(avg_perceptual_loss)
+    metrics_history['ssim_loss_unweighted'].append(avg_ssim_loss)
+    metrics_history['gan_loss_weighted'].append(avg_gan_loss_weighted)
+    metrics_history['pixel_loss_weighted'].append(avg_pixel_loss_weighted)
+    metrics_history['perceptual_loss_weighted'].append(avg_perceptual_loss_weighted)
+    metrics_history['ssim_loss_weighted'].append(avg_ssim_loss_weighted)
+    metrics_history['learning_rate'].append(optimizer_G.param_groups[0]['lr'])
+    
+    # Generate and update the loss plots
+    update_loss_plots(metrics_history, exp_dir, log_dir)
+    
     # Log losses to a file
     with open(log_dir / 'training_log.txt', 'w') as f:
         f.write(f"Training Epoch {epoch} Losses:\n")
@@ -567,6 +691,12 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     
     print(f'Validation Loss: {avg_val_loss:.4f}')
     
+    # Update validation loss in metrics history
+    metrics_history['val_loss'].append(avg_val_loss)
+    
+    # Update the loss plots after validation
+    update_loss_plots(metrics_history, exp_dir, log_dir)
+    
     # Generate sample visualizations
     print("\n" + "=" * 80)
     print(f"GENERATING VISUALIZATIONS")
@@ -631,7 +761,7 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         f.write(f"- Visualizations: {vis_dir}\n")
         f.write(f"- Loss logs: {log_dir}\n")
     
-    return exp_dir
+    return exp_dir, metrics_history
 
 
 if __name__ == "__main__":
@@ -653,8 +783,8 @@ if __name__ == "__main__":
         use_circle_crop = False
     
     try:
-        run_mini_test(args.config, args.num_samples, use_circle_crop)
-        print("Mini test completed successfully!")
+        exp_dir, metrics_history = run_mini_test(args.config, args.num_samples, use_circle_crop)
+        print(f"Mini test completed successfully! Results saved to {exp_dir}")
     except Exception as e:
         print(f"Error in mini test: {str(e)}")
         raise
