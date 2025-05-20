@@ -96,15 +96,20 @@ class Trainer:
         self.config['preprocessing']['circle_crop'] = use_circle_crop
         self.config['preprocessing']['crop_padding'] = 10  # Default padding
 
+        # Get model size for including in experiment ID
+        model_size = self.config['model'].get('size', 'medium')
+        
         # Set experiment ID
         if exp_id:
             self.exp_id = exp_id
         else:
             # Generate a timestamp-based experiment ID if none provided
-            # Format: MMDD_HHMMSS (month, day, hour, minute, second)
-            self.exp_id = datetime.now().strftime("%m%d_%H%M%S")
+            # Format: MMDD_HHMMSS_modelSize (month, day, hour, minute, second, size)
+            timestamp = datetime.now().strftime("%m%d_%H%M%S")
+            self.exp_id = f"{timestamp}_{model_size}"
 
         print(f"Running experiment: {self.exp_id}")
+        print(f"Model size: {model_size}")
         print(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}")
 
         # Create a parent experiment directory (just use the ID as the folder name)
@@ -145,9 +150,14 @@ class Trainer:
         self.early_stop_counter = 0
         self.best_val_loss = float('inf')
 
-        # Initialize models
-        self.generator = Generator(spectral_channels=self.config['model']['spectral_channels']).to(self.device)
-        self.discriminator = Discriminator().to(self.device)
+        # Initialize models with the specified size
+        model_size = self.config['model'].get('size', 'medium')
+        print(f"\nUsing model size: {model_size}")
+        self.generator = Generator(
+            spectral_channels=self.config['model']['spectral_channels'],
+            model_size=model_size
+        ).to(self.device)
+        self.discriminator = Discriminator(model_size=model_size).to(self.device)
 
         # Initialize weights
         init_weights(self.generator)
@@ -277,9 +287,10 @@ class Trainer:
     def update_loss_plots(self):
         """
         Generate and update the loss plots based on current metrics.
-        Creates two plots:
+        Creates three plots:
         1. Training losses (G loss and D loss)
         2. Validation loss (if available)
+        3. Total training loss vs validation loss (to see overall convergence)
         """
         # Create the plots directory if it doesn't exist
         plots_dir = self.exp_dir / 'plots'
@@ -347,6 +358,42 @@ class Trainer:
             # Save the components plot
             components_plot_path = plots_dir / 'loss_components.png'
             plt.savefig(components_plot_path, dpi=120, bbox_inches='tight')
+            plt.close()
+            
+            # 3. Plot total training loss vs validation loss
+            plt.figure(figsize=(12, 6))
+            
+            # Calculate and plot total weighted loss (sum of all weighted loss components)
+            # Initialize with zeros
+            total_loss = np.zeros(len(epochs))
+            
+            # Add each enabled component
+            if 'pixel_loss_weighted' in self.metrics_history:
+                total_loss += np.array(self.metrics_history['pixel_loss_weighted'])
+            if 'ssim_loss_weighted' in self.metrics_history:
+                total_loss += np.array(self.metrics_history['ssim_loss_weighted'])
+            if 'gan_loss_weighted' in self.metrics_history:
+                total_loss += np.array(self.metrics_history['gan_loss_weighted'])
+            if 'perceptual_loss_weighted' in self.metrics_history:
+                total_loss += np.array(self.metrics_history['perceptual_loss_weighted'])
+                
+            # Plot total training loss
+            plt.plot(epochs, total_loss, 'b-', label='Total Loss (Combined Components)')
+            
+            # Plot validation loss on same graph for comparison
+            if 'val_loss' in self.metrics_history and len(self.metrics_history['val_loss']) > 0:
+                val_epochs = epochs[:len(self.metrics_history['val_loss'])]
+                plt.plot(val_epochs, self.metrics_history['val_loss'], 'r-', label='Validation Loss')
+            
+            plt.title('Total Training Loss vs Validation Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # Save the combined plot
+            total_loss_path = plots_dir / 'total_vs_validation_loss.png'
+            plt.savefig(total_loss_path, dpi=120, bbox_inches='tight')
             plt.close()
             
         # Log the plot update
@@ -992,6 +1039,7 @@ class Trainer:
         self.update_loss_plots()
         
         # Also create the full detailed plots from visualization_utils for reference
+        # This will include the total training loss vs validation loss plot
         save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
 
         # Final cleanup

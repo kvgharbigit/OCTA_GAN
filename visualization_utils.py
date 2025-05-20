@@ -217,6 +217,50 @@ def save_loss_plots(metrics_history, output_dir, log_dir=None):
         plt.savefig(val_loss_path)
         plt.close()
     
+    # Plot total training loss (combined components) vs validation loss
+    plt.figure(figsize=(12, 8))
+    
+    # Calculate and plot total weighted loss (sum of all weighted loss components)
+    if all(key in metrics_history for key in ['gan_loss_weighted', 'pixel_loss_weighted', 'ssim_loss_weighted']):
+        # Create arrays with zeros for any missing values
+        epochs = metrics_history['epoch']
+        total_loss = np.zeros(len(epochs))
+        
+        # Add each component
+        if 'pixel_loss_weighted' in metrics_history:
+            total_loss += np.array(metrics_history['pixel_loss_weighted'])
+        if 'ssim_loss_weighted' in metrics_history:
+            total_loss += np.array(metrics_history['ssim_loss_weighted'])
+        if 'gan_loss_weighted' in metrics_history:
+            total_loss += np.array(metrics_history['gan_loss_weighted'])
+        if 'perceptual_loss_weighted' in metrics_history:
+            total_loss += np.array(metrics_history['perceptual_loss_weighted'])
+            
+        # Plot total training loss
+        plt.plot(epochs, total_loss, 'b-', label='Total Training Loss (Combined Components)')
+        
+        # Plot validation loss on same graph for comparison
+        if 'val_loss' in metrics_history and metrics_history['val_loss']:
+            val_epochs = epochs[:len(metrics_history['val_loss'])]
+            plt.plot(val_epochs, metrics_history['val_loss'], 'r-', label='Validation Loss')
+        
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Total Training Loss vs Validation Loss')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # Save the combined plot
+        combined_loss_path = output_dir / 'total_vs_validation_loss.png'
+        plt.savefig(combined_loss_path)
+        plt.close()
+        
+        # Log the new plot
+        if log_dir is not None:
+            with open(log_dir / 'plot_log.txt', 'a') as f:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"{timestamp}: Saved total vs validation loss plot to {combined_loss_path}\n")
+    
     # Plot component losses
     plt.figure(figsize=(12, 8))
     

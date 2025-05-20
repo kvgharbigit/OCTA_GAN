@@ -406,94 +406,124 @@ class Generator(nn.Module):
     OCTA output.
     """
 
-    def __init__(self, spectral_channels: int = 31):
+    def __init__(self, spectral_channels: int = 31, model_size: str = "medium"):
         """
         Initialize the generator network.
 
         Args:
             spectral_channels: Number of spectral channels in the input HSI data
+            model_size: Size of the model ('small', 'medium', or 'large')
         """
         super(Generator, self).__init__()
+        
+        # Define filter sizes based on model size
+        if model_size == "small":
+            initial_filters = 16
+            mid_filters = 32
+            max_filters = 64
+            # More balanced encoder-decoder progression
+            decoder_mid_filters = 48  # Between initial and max
+        elif model_size == "medium":
+            initial_filters = 32
+            mid_filters = 64
+            max_filters = 128
+            # More balanced encoder-decoder progression
+            decoder_mid_filters = 96  # Between initial and max
+        elif model_size == "large":
+            initial_filters = 64
+            mid_filters = 128
+            max_filters = 320  # Increased for better balance with discriminator
+            # More balanced encoder-decoder progression
+            decoder_mid_filters = 192  # Between initial and max
+        else:
+            raise ValueError(f"Invalid model size: {model_size}. Choose from 'small', 'medium', or 'large'")
+            
+        print(f"Initializing Generator with {model_size} size: {initial_filters}/{mid_filters}/{max_filters} filters")
 
         # Encoder layers - process 3D input data with spectral dimension reduction
         self.encoder = nn.ModuleList([
-            # [B, 1, 31, 500, 500] -> [B, 32, 16, 500, 500]
+            # [B, 1, 31, 500, 500] -> [B, initial_filters, 16, 500, 500]
             # First encoder layer reduces spectral dimensions by half
-            nn.Conv3d(1, 32, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
+            nn.Conv3d(1, initial_filters, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
 
-            # [B, 32, 16, 500, 500] -> [B, 64, 8, 500, 500]
+            # [B, initial_filters, 16, 500, 500] -> [B, mid_filters, 8, 500, 500]
             # Second encoder layer further reduces spectral dimensions
-            nn.Conv3d(32, 64, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
+            nn.Conv3d(initial_filters, mid_filters, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1)),
 
-            # [B, 64, 8, 500, 500] -> [B, 128, 4, 500, 500]
+            # [B, mid_filters, 8, 500, 500] -> [B, max_filters, 4, 500, 500]
             # Third encoder layer creates deep features with reduced spectral dimensions
-            nn.Conv3d(64, 128, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))
+            nn.Conv3d(mid_filters, max_filters, kernel_size=(3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))
         ])
 
         # Skip connections to preserve spatial information
         self.skip_connections = nn.ModuleList([
             # Process features from first encoder layer for skip connection
             nn.Sequential(
-                nn.Conv3d(32, 32, 1),  # 1x1x1 convolution to refine features
-                nn.BatchNorm3d(32),
+                nn.Conv3d(initial_filters, initial_filters, 1),  # 1x1x1 convolution to refine features
+                nn.BatchNorm3d(initial_filters),
                 nn.ReLU()
             ),
             # Process features from second encoder layer for skip connection
             nn.Sequential(
-                nn.Conv3d(64, 64, 1),  # 1x1x1 convolution to refine features
-                nn.BatchNorm3d(64),
+                nn.Conv3d(mid_filters, mid_filters, 1),  # 1x1x1 convolution to refine features
+                nn.BatchNorm3d(mid_filters),
                 nn.ReLU()
             )
         ])
 
+        # Calculate the concatenated channel sizes for reduction layers
+        concat1_channels = max_filters + mid_filters
+        concat2_channels = max_filters + initial_filters
+
         # Channel reduction layers after concatenation with skip connections
+        # The first reduction layer output needs to match the first decoder input
         self.reduction_layers = nn.ModuleList([
             # Reduce channels after first skip concatenation
             nn.Sequential(
-                nn.Conv2d(192, 128, 1),  # 128 + 64 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(concat1_channels, max_filters, 1),  # (max_filters + mid_filters) -> max_filters
+                nn.BatchNorm2d(max_filters),
                 nn.ReLU()
             ),
             # Reduce channels after second skip concatenation
             nn.Sequential(
-                nn.Conv2d(160, 128, 1),  # 128 + 32 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(concat2_channels, decoder_mid_filters, 1),  # (decoder_mid_filters + initial_filters) -> decoder_mid_filters
+                nn.BatchNorm2d(decoder_mid_filters),
                 nn.ReLU()
             )
         ])
 
-        # Decoder layers with corrected channel dimensions
+        # Decoder layers with more balanced progression
         self.decoder = nn.ModuleList([
             # First decoder block - maintain high-level features
             nn.Sequential(
-                nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(max_filters, max_filters, 3, 1, 1),  # max_filters -> max_filters
+                nn.BatchNorm2d(max_filters),
                 nn.ReLU(),
-                nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(max_filters, decoder_mid_filters, 3, 1, 1),  # max_filters -> decoder_mid_filters
+                nn.BatchNorm2d(decoder_mid_filters),
                 nn.ReLU()
             ),
-            # Second decoder block - maintain high-level features
+            # Second decoder block - more gradual progression
             nn.Sequential(
-                nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(decoder_mid_filters, decoder_mid_filters, 3, 1, 1),  # decoder_mid_filters -> decoder_mid_filters
+                nn.BatchNorm2d(decoder_mid_filters),
                 nn.ReLU(),
-                nn.Conv2d(128, 128, 3, 1, 1),  # 128 -> 128
-                nn.BatchNorm2d(128),
+                nn.Conv2d(decoder_mid_filters, mid_filters, 3, 1, 1),  # decoder_mid_filters -> mid_filters
+                nn.BatchNorm2d(mid_filters),
                 nn.ReLU()
             ),
-            # Third decoder block - start reducing features
+            # Third decoder block - more balanced reduction
             nn.Sequential(
-                nn.Conv2d(128, 64, 3, 1, 1),  # 128 -> 64
-                nn.BatchNorm2d(64),
+                nn.Conv2d(mid_filters, mid_filters, 3, 1, 1),  # mid_filters -> mid_filters
+                nn.BatchNorm2d(mid_filters),
                 nn.ReLU(),
-                nn.Conv2d(64, 32, 3, 1, 1),  # 64 -> 32
-                nn.BatchNorm2d(32),
+                nn.Conv2d(mid_filters, initial_filters, 3, 1, 1),  # mid_filters -> initial_filters
+                nn.BatchNorm2d(initial_filters),
                 nn.ReLU()
             ),
             # Final output layer - generate single-channel OCTA
             nn.Sequential(
-                nn.Conv2d(32, 1, 3, 1, 1),  # 32 -> 1
+                nn.Conv2d(initial_filters, 1, 3, 1, 1),  # initial_filters -> 1
                 nn.Tanh()  # Output in range [-1, 1]
             )
         ])
@@ -546,9 +576,35 @@ class Discriminator(nn.Module):
     allowing it to focus on local texture details rather than global structure.
     """
 
-    def __init__(self):
-        """Initialize the PatchGAN discriminator network."""
+    def __init__(self, model_size: str = "medium"):
+        """
+        Initialize the PatchGAN discriminator network.
+        
+        Args:
+            model_size: Size of the model ('small', 'medium', or 'large')
+        """
         super(Discriminator, self).__init__()
+        
+        # Define filter sizes based on model size with improved balance
+        if model_size == "small":
+            initial_filters = 32
+            mid_filters = 48
+            large_filters = 96
+            max_filters = 128  # Reduced from 256 for better generator/discriminator balance
+        elif model_size == "medium":
+            initial_filters = 64
+            mid_filters = 96
+            large_filters = 192
+            max_filters = 256  # Reduced from 512 for better generator/discriminator balance
+        elif model_size == "large":
+            initial_filters = 96
+            mid_filters = 192
+            large_filters = 320
+            max_filters = 512  # Reduced from 1024 for better generator/discriminator balance
+        else:
+            raise ValueError(f"Invalid model size: {model_size}. Choose from 'small', 'medium', or 'large'")
+            
+        print(f"Initializing Discriminator with {model_size} size: {initial_filters}/{mid_filters}/{large_filters}/{max_filters} filters")
 
         def discriminator_block(in_channels: int, out_channels: int,
                                 normalize: bool = True) -> List[nn.Module]:
@@ -571,11 +627,11 @@ class Discriminator(nn.Module):
 
         # For 500x500 input, output will be 31x31 patches
         self.model = nn.Sequential(
-            *discriminator_block(1, 64, normalize=False),  # No normalization on first layer
-            *discriminator_block(64, 128),
-            *discriminator_block(128, 256),
-            *discriminator_block(256, 512),
-            nn.Conv2d(512, 1, 4, padding=1),
+            *discriminator_block(1, initial_filters, normalize=False),  # No normalization on first layer
+            *discriminator_block(initial_filters, mid_filters),
+            *discriminator_block(mid_filters, large_filters),
+            *discriminator_block(large_filters, max_filters),
+            nn.Conv2d(max_filters, 1, 4, padding=1),
             nn.Sigmoid()  # Output in range [0, 1] - probability that patch is real
         )
 

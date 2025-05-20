@@ -2,6 +2,12 @@
 # HSI to OCTA Translation Model Implementation
 #
 ## Architecture Overview
+
+### Model Size Variants
+
+The model is available in three sizes: small, medium and large, with different filter capacities.
+
+### Small Model Architecture (Balanced)
 ```
 Input HSI [B, 31, 500, 500]
       |
@@ -9,7 +15,64 @@ Input HSI [B, 31, 500, 500]
 [B, 1, 31, 500, 500] (Unsqueeze)
       |
       v
-GENERATOR ENCODER
+GENERATOR ENCODER (SMALL)
+      |
+    Conv3d_1 [B, 16, 16, 500, 500] -----> Skip1 [B, 16, 16, 500, 500]
+      |
+    Conv3d_2 [B, 32, 8, 500, 500]  -----> Skip2 [B, 32, 8, 500, 500]
+      |
+    Conv3d_3 [B, 64, 4, 500, 500]
+      |
+   MaxPool2d [B, 64, 500, 500]
+      |
+      v
+GENERATOR DECODER (SMALL)
+      |
+    Cat+Red1 [B, 96, 500, 500] <----- Skip2.max() [B, 32, 500, 500]
+      |
+    Conv2d_1 [B, 64, 500, 500]
+      |                      
+    Conv2d_2 [B, 48, 500, 500]
+      |
+    Cat+Red2 [B, 64, 500, 500] <----- Skip1.max() [B, 16, 500, 500]
+      |
+    Conv2d_3 [B, 48, 500, 500]
+      |
+    Conv2d_4 [B, 32, 500, 500]
+      |
+    Conv2d_5 [B, 32, 500, 500]
+      |
+    Conv2d_6 [B, 16, 500, 500]
+      |
+    Conv2d_7 [B, 1, 500, 500]
+      |
+      v
+Output OCTA [B, 1, 500, 500] --------> DISCRIMINATOR (SMALL)
+                                          |
+                                     Conv2d_1 [B, 32, 250, 250]
+                                          |
+                                     Conv2d_2 [B, 48, 125, 125]
+                                          |
+                                     Conv2d_3 [B, 96, 62, 62]
+                                          |
+                                     Conv2d_4 [B, 128, 31, 31]
+                                          |
+                                     Conv2d_5 [B, 1, 30, 30]
+                                          |
+                                          v
+                                   Binary Output
+                                   Real/Fake Score
+```
+
+### Medium Model Architecture (Default, Balanced)
+```
+Input HSI [B, 31, 500, 500]
+      |
+      v
+[B, 1, 31, 500, 500] (Unsqueeze)
+      |
+      v
+GENERATOR ENCODER (MEDIUM)
       |
     Conv3d_1 [B, 32, 16, 500, 500] -----> Skip1 [B, 32, 16, 500, 500]
       |
@@ -20,30 +83,91 @@ GENERATOR ENCODER
    MaxPool2d [B, 128, 500, 500]
       |
       v
-GENERATOR DECODER
+GENERATOR DECODER (MEDIUM)
       |
     Cat+Red1 [B, 192, 500, 500] <----- Skip2.max() [B, 64, 500, 500]
       |
     Conv2d_1 [B, 128, 500, 500]
+      |                      
+    Conv2d_2 [B, 96, 500, 500]
       |
-    Cat+Red2 [B, 160, 500, 500] <----- Skip1.max() [B, 32, 500, 500]
+    Cat+Red2 [B, 128, 500, 500] <----- Skip1.max() [B, 32, 500, 500]
       |
-    Conv2d_2 [B, 128, 500, 500]
+    Conv2d_3 [B, 96, 500, 500]
       |
-    Conv2d_3 [B, 64, 500, 500]
+    Conv2d_4 [B, 64, 500, 500]
       |
-    Conv2d_4 [B, 32, 500, 500]
+    Conv2d_5 [B, 64, 500, 500]
       |
-    Conv2d_5 [B, 1, 500, 500]
+    Conv2d_6 [B, 32, 500, 500]
+      |
+    Conv2d_7 [B, 1, 500, 500]
       |
       v
-Output OCTA [B, 1, 500, 500] --------> DISCRIMINATOR
+Output OCTA [B, 1, 500, 500] --------> DISCRIMINATOR (MEDIUM)
                                           |
                                      Conv2d_1 [B, 64, 250, 250]
                                           |
-                                     Conv2d_2 [B, 128, 125, 125]
+                                     Conv2d_2 [B, 96, 125, 125]
                                           |
-                                     Conv2d_3 [B, 256, 62, 62]
+                                     Conv2d_3 [B, 192, 62, 62]
+                                          |
+                                     Conv2d_4 [B, 256, 31, 31]
+                                          |
+                                     Conv2d_5 [B, 1, 30, 30]
+                                          |
+                                          v
+                                   Binary Output
+                                   Real/Fake Score
+```
+
+### Large Model Architecture (Balanced)
+```
+Input HSI [B, 31, 500, 500]
+      |
+      v
+[B, 1, 31, 500, 500] (Unsqueeze)
+      |
+      v
+GENERATOR ENCODER (LARGE)
+      |
+    Conv3d_1 [B, 64, 16, 500, 500] -----> Skip1 [B, 64, 16, 500, 500]
+      |
+    Conv3d_2 [B, 128, 8, 500, 500]  -----> Skip2 [B, 128, 8, 500, 500]
+      |
+    Conv3d_3 [B, 320, 4, 500, 500]  # Increased capacity
+      |
+   MaxPool2d [B, 320, 500, 500]
+      |
+      v
+GENERATOR DECODER (LARGE)
+      |
+    Cat+Red1 [B, 448, 500, 500] <----- Skip2.max() [B, 128, 500, 500]
+      |
+    Conv2d_1 [B, 320, 500, 500]
+      |                      
+    Conv2d_2 [B, 192, 500, 500]
+      |
+    Cat+Red2 [B, 256, 500, 500] <----- Skip1.max() [B, 64, 500, 500]
+      |
+    Conv2d_3 [B, 192, 500, 500]
+      |
+    Conv2d_4 [B, 128, 500, 500]
+      |
+    Conv2d_5 [B, 128, 500, 500]
+      |
+    Conv2d_6 [B, 64, 500, 500]
+      |
+    Conv2d_7 [B, 1, 500, 500]
+      |
+      v
+Output OCTA [B, 1, 500, 500] --------> DISCRIMINATOR (LARGE)
+                                          |
+                                     Conv2d_1 [B, 96, 250, 250]
+                                          |
+                                     Conv2d_2 [B, 192, 125, 125]
+                                          |
+                                     Conv2d_3 [B, 320, 62, 62]
                                           |
                                      Conv2d_4 [B, 512, 31, 31]
                                           |

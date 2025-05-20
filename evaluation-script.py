@@ -48,12 +48,25 @@ class Evaluator:
         if not checkpoint_path:
             raise ValueError("Missing checkpoint_path in configuration")
 
-        # Initialize model
-        self.generator = Generator().to(self.device)
-
-        # Load checkpoint
+        # Load checkpoint first to get the model configuration
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        
+        # Get model size from the config or checkpoint or use default 'medium'
+        model_size = self.config.get('model', {}).get('size', 'medium')
+        
+        # If the checkpoint has a config, use that model size instead (for backwards compatibility)
+        if 'config' in checkpoint and 'model' in checkpoint['config'] and 'size' in checkpoint['config']['model']:
+            model_size = checkpoint['config']['model']['size']
+            print(f"Using model size from checkpoint config: {model_size}")
+        else:
+            print(f"Using model size from evaluation config: {model_size}")
+            
+        # Initialize model with appropriate size
+        spectral_channels = self.config.get('model', {}).get('spectral_channels', 31)
+        self.generator = Generator(spectral_channels=spectral_channels, model_size=model_size).to(self.device)
+        
+        # Load the model weights
         self.generator.load_state_dict(checkpoint['generator_state_dict'])
         self.epoch = checkpoint.get('epoch', 'unknown')
 
@@ -70,6 +83,16 @@ class Evaluator:
             self.use_circle_crop = True
             print(f"No circle_crop setting found in checkpoint, defaulting to: {self.use_circle_crop}")
 
+        # Get model size for including in experiment ID
+        model_size = self.config.get('model', {}).get('size', 'medium')
+        
+        # If the checkpoint has a config, use that model size instead (for backwards compatibility)
+        if 'config' in checkpoint and 'model' in checkpoint['config'] and 'size' in checkpoint['config']['model']:
+            model_size = checkpoint['config']['model']['size']
+            print(f"Using model size from checkpoint config: {model_size}")
+        else:
+            print(f"Using model size from evaluation config: {model_size}")
+        
         # Set experiment ID
         if exp_id:
             self.exp_id = exp_id
@@ -78,9 +101,9 @@ class Evaluator:
             self.exp_id = checkpoint['exp_id']
             print(f"Using experiment ID from checkpoint: {self.exp_id}")
         else:
-            # Use experiment ID from config or generate a timestamp-based one
-            self.exp_id = self.config.get('evaluation', {}).get('exp_id',
-                                                                datetime.now().strftime("%Y%m%d_%H%M%S"))
+            # Use experiment ID from config or generate a timestamp-based one with model size
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.exp_id = self.config.get('evaluation', {}).get('exp_id', f"{timestamp}_eval_{model_size}")
             print(f"Using experiment ID: {self.exp_id}")
 
         # Set output base directory
@@ -315,6 +338,7 @@ class Evaluator:
             'device': str(self.device),
             'num_test_samples': len(self.test_dataset),
             'circle_crop': self.use_circle_crop,
+            'model_size': self.config.get('model', {}).get('size', 'medium'),
             'config_file': self.config,
             'mean_metrics': {
                 metric: float(np.mean(values))

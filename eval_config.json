@@ -14,6 +14,12 @@
     "data": {
         "target_size": 500
     },
+    
+    "// Model Architecture": null,
+    "model": {
+        "spectral_channels": 31,
+        "size": "medium"
+    },
 
     "// Preprocessing": null,
     "preprocessing": {
