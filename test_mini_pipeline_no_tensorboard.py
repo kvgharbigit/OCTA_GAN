@@ -27,6 +27,14 @@ import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+# Custom JSON encoder to handle Path objects
+class PathEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Path):
+            return str(obj)
+        return super().default(obj)
+
 from base import (
     Generator, Discriminator,
     PerceptualLoss, SSIMLoss,
@@ -582,6 +590,10 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     
     # Save checkpoint
     checkpoint_path = config['output']['checkpoint_dir'] / 'mini_test_checkpoint.pth'
+    
+    # Convert Path objects in config to strings for serialization
+    serializable_config = json.loads(json.dumps(config, cls=PathEncoder))
+    
     save_checkpoint({
         'epoch': epoch,
         'exp_id': exp_id,
@@ -590,7 +602,7 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         'optimizer_G_state_dict': optimizer_G.state_dict(),
         'optimizer_D_state_dict': optimizer_D.state_dict(),
         'val_loss': avg_val_loss,
-        'config': config,
+        'config': serializable_config,
         'circle_crop': use_circle_crop
     }, str(checkpoint_path))
     
@@ -629,7 +641,7 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     
     # Save a copy of the config file to the experiment directory
     with open(exp_dir / 'config.json', 'w') as f:
-        json.dump(config, f, indent=4)
+        json.dump(config, f, indent=4, cls=PathEncoder)
     
     return exp_dir, metrics_history
 
