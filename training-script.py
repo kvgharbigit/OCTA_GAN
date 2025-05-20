@@ -101,13 +101,14 @@ class Trainer:
             self.exp_id = exp_id
         else:
             # Generate a timestamp-based experiment ID if none provided
-            self.exp_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Format: MMDD_HHMMSS (month, day, hour, minute, second)
+            self.exp_id = datetime.now().strftime("%m%d_%H%M%S")
 
         print(f"Running experiment: {self.exp_id}")
         print(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}")
 
-        # Create a parent experiment directory
-        self.exp_dir = Path(self.config['output']['base_dir']) / f"experiment_{self.exp_id}"
+        # Create a parent experiment directory (just use the ID as the folder name)
+        self.exp_dir = Path(self.config['output']['base_dir']) / f"{self.exp_id}"
         self.exp_dir.mkdir(parents=True, exist_ok=True)
         print(f"Created experiment directory: {self.exp_dir}")
 
@@ -272,6 +273,86 @@ class Trainer:
                         self.metrics_history[key] = [value]  # Initialize if empty
                     else:
                         self.metrics_history[key].append(value)
+    
+    def update_loss_plots(self):
+        """
+        Generate and update the loss plots based on current metrics.
+        Creates two plots:
+        1. Training losses (G loss and D loss)
+        2. Validation loss (if available)
+        """
+        # Create the plots directory if it doesn't exist
+        plots_dir = self.exp_dir / 'plots'
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check if we have any data to plot
+        if len(self.metrics_history['epoch']) == 0:
+            return
+        
+        # 1. Training losses plot
+        plt.figure(figsize=(12, 6))
+        epochs = self.metrics_history['epoch']
+        
+        # Plot generator loss
+        if 'g_loss_total' in self.metrics_history and len(self.metrics_history['g_loss_total']) > 0:
+            plt.plot(epochs, self.metrics_history['g_loss_total'], 'b-', label='Generator Loss')
+        
+        # Plot discriminator loss
+        if 'd_loss' in self.metrics_history and len(self.metrics_history['d_loss']) > 0:
+            plt.plot(epochs, self.metrics_history['d_loss'], 'r-', label='Discriminator Loss')
+        
+        # Plot validation loss on the same graph if available
+        if 'val_loss' in self.metrics_history and len(self.metrics_history['val_loss']) > 0:
+            # Make sure val_loss array is the same length as epochs
+            val_epochs = epochs[:len(self.metrics_history['val_loss'])]
+            plt.plot(val_epochs, self.metrics_history['val_loss'], 'g-', label='Validation Loss')
+        
+        plt.title('Training and Validation Losses')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # If we're in early epochs, use appropriate y-axis scaling
+        if len(epochs) < 5:
+            plt.ylim(bottom=0)  # Start y-axis at 0
+        
+        # Save the figure, overwriting any existing file
+        loss_plot_path = plots_dir / 'losses.png'
+        plt.savefig(loss_plot_path, dpi=120, bbox_inches='tight')
+        plt.close()
+        
+        # 2. Component losses plot (if we have more than one epoch)
+        if len(epochs) > 1:
+            plt.figure(figsize=(12, 6))
+            
+            # Only plot enabled loss components
+            component_losses = [
+                ('pixel_loss_weighted', 'Pixel Loss (L1)', 'b-'),
+                ('perceptual_loss_weighted', 'Perceptual Loss', 'r-'),
+                ('ssim_loss_weighted', 'SSIM Loss', 'g-'),
+                ('gan_loss_weighted', 'GAN Loss', 'm-')
+            ]
+            
+            for key, label, style in component_losses:
+                if key in self.metrics_history and any(v > 0 for v in self.metrics_history[key]):
+                    plt.plot(epochs, self.metrics_history[key], style, label=label)
+            
+            plt.title('Loss Components (Weighted)')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss Value')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # Save the components plot
+            components_plot_path = plots_dir / 'loss_components.png'
+            plt.savefig(components_plot_path, dpi=120, bbox_inches='tight')
+            plt.close()
+            
+        # Log the plot update
+        with open(self.log_dir / 'plot_log.txt', 'a') as f:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{timestamp}: Updated loss plots at epoch {epochs[-1]}\n")
 
     def setup_data(self):
         """Setup datasets and dataloaders."""
@@ -886,9 +967,8 @@ class Trainer:
                 self.scheduler_G.step()
                 self.scheduler_D.step()
 
-            # Generate loss plots periodically
-            if epoch % 10 == 0 or epoch == self.config['num_epochs'] - 1:
-                save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
+            # Generate loss plots after each epoch
+            self.update_loss_plots()
 
             # Print epoch summary
             epoch_time = time.time() - start_time
@@ -908,7 +988,10 @@ class Trainer:
         # Generate and save final training summary
         summary_path = self.generate_training_summary(total_training_time, reason="final")
 
-        # Generate final plots
+        # Generate final plots with the most complete data
+        self.update_loss_plots()
+        
+        # Also create the full detailed plots from visualization_utils for reference
         save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
 
         # Final cleanup

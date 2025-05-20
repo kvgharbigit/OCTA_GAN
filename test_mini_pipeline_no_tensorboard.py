@@ -143,8 +143,9 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         use_circle_crop: Whether to use circle cropping
     """
     # Setup experiment name with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    exp_id = f"mini_test_{timestamp}"
+    # Format: MMDD_HHMMSS (month, day, hour, minute, second)
+    timestamp = datetime.now().strftime("%m%d_%H%M%S")
+    exp_id = f"test_{timestamp}"
     
     # Load configuration
     config = load_config(config_path)
@@ -168,14 +169,14 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
             base_dir = config.get('data', {}).get('base_dir', '')
             original_csv_path = Path(original_csv_path_str.replace("${base_dir}", base_dir))
     
-    mini_csv_path = Path(original_csv_path).parent / f"mini_test_{num_samples}_{timestamp}.csv"
+    mini_csv_path = Path(original_csv_path).parent / f"test_data_{num_samples}_{timestamp}.csv"
     create_mini_csv(original_csv_path, mini_csv_path, num_samples)
     
     # Update config with mini dataset path
     config['data']['approved_csv_path'] = str(mini_csv_path)
     
-    # Create experiment directory
-    exp_dir = Path(config['output']['base_dir']) / f"experiment_{exp_id}"
+    # Create experiment directory (just use the ID as the folder name)
+    exp_dir = Path(config['output']['base_dir']) / f"{exp_id}"
     exp_dir.mkdir(parents=True, exist_ok=True)
     print(f"Created experiment directory: {exp_dir}")
     
