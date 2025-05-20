@@ -195,7 +195,20 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     
     # Setup hardware
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    
+    # Add more visible device information
+    print("\n" + "=" * 50)
+    if device.type == 'cuda':
+        print(f"🔥 USING GPU: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"Memory Available: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    else:
+        print("⚠️ USING CPU: GPU NOT AVAILABLE")
+        print("Training will be significantly slower on CPU.")
+        print("Consider using a machine with an NVIDIA GPU for faster training.")
+    print("=" * 50 + "\n")
+    
+    print(f"Device: {device}")
     
     # Initialize models
     generator = Generator(spectral_channels=config['model']['spectral_channels']).to(device)

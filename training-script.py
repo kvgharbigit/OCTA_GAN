@@ -125,7 +125,20 @@ class Trainer:
         validate_directories(self.config)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"Using device: {self.device}")
+        
+        # Add more visible device information
+        print("\n" + "=" * 50)
+        if self.device.type == 'cuda':
+            print(f"🔥 USING GPU: {torch.cuda.get_device_name(0)}")
+            print(f"CUDA Version: {torch.version.cuda}")
+            print(f"Memory Available: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        else:
+            print("⚠️ USING CPU: GPU NOT AVAILABLE")
+            print("Training will be significantly slower on CPU.")
+            print("Consider using a machine with an NVIDIA GPU for faster training.")
+        print("=" * 50 + "\n")
+        
+        print(f"Device: {self.device}")
 
         # Initialize early stopping variables
         self.early_stop_counter = 0
