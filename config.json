@@ -1,6 +1,6 @@
 {
     "// Training Parameters": null,
-    "num_epochs": 200,
+    "num_epochs": 150,
     "batch_size": 3,
     "learning_rate": 0.0001,
     "beta1": 0.5,
@@ -26,7 +26,7 @@
         "data_dir": "Z:\\Projects\\Ophthalmic neuroscience\\Projects\\Control Database 2024\\Kayvan_experiments\\Kayvans_Model_Dataset",
         "approved_csv_path": "${base_dir}\\approved_patients\\approved_participants_global.csv",
         "val_ratio": 0.1,
-        "test_ratio": 0.2,
+        "test_ratio": 0.1,
         "target_size": 500,
         "random_seed": 42
     },
@@ -69,7 +69,7 @@
     "// Model Architecture": null,
     "model": {
         "spectral_channels": 31,
-        "size": "medium",
+        "size": "small",
         "generator": {
             "initial_filters": 32,
             "max_filters": 128
