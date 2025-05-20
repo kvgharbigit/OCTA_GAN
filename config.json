@@ -15,10 +15,10 @@
     },
 
     "// Loss Weights": null,
-    "lambda_pixel": 0,
+    "lambda_pixel": 5,
     "lambda_perceptual": 0,
-    "lambda_ssim": 50,
-    "lambda_adv": 10,
+    "lambda_ssim": 10,
+    "lambda_adv": 1,
 
     "// Data Parameters": null,
     "data": {
@@ -111,7 +111,7 @@
 
     "// Loss Settings": null,
     "loss_components": {
-        "pixel_enabled": false,
+        "pixel_enabled": true,
         "perceptual_enabled": false,
         "ssim_enabled": true,
         "adversarial_enabled": true
