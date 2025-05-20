@@ -10,7 +10,8 @@ import h5py
 from PIL import Image
 from pathlib import Path
 from torch.nn import init
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, TextIO
+import sys
 
 
 
@@ -866,17 +867,36 @@ def get_scheduler(optimizer, config):
         )
     elif scheduler_type == 'ReduceLROnPlateau':
         # Plateau scheduler: reduces LR when a metric stops improving
-        return torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode=scheduler_config.get('mode', 'min'),
-            factor=scheduler_config.get('factor', 0.1),
-            patience=scheduler_config.get('patience', 10),
-            min_lr=scheduler_config.get('min_lr', 1e-6),
-            verbose=scheduler_config.get('verbose', True),
-            threshold=scheduler_config.get('threshold', 1e-4),
-            cooldown=scheduler_config.get('cooldown', 0),
-            threshold_mode=scheduler_config.get('threshold_mode', 'rel')
-        )
+        # Create parameters dictionary and filter out unsupported parameters
+        scheduler_kwargs = {
+            'optimizer': optimizer,
+            'mode': scheduler_config.get('mode', 'min'),
+            'factor': scheduler_config.get('factor', 0.1),
+            'patience': scheduler_config.get('patience', 10),
+            'min_lr': scheduler_config.get('min_lr', 1e-6),
+            'threshold': scheduler_config.get('threshold', 1e-4),
+            'cooldown': scheduler_config.get('cooldown', 0),
+            'threshold_mode': scheduler_config.get('threshold_mode', 'rel')
+        }
+        
+        # Try to add verbose if supported by this PyTorch version
+        try:
+            # Create a small test scheduler to check if verbose is supported
+            test_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer=optimizer,
+                verbose=True
+            )
+            # If no error, verbose is supported
+            scheduler_kwargs['verbose'] = scheduler_config.get('verbose', True)
+        except TypeError:
+            # verbose parameter is not supported in this PyTorch version
+            print("Note: 'verbose' parameter is not supported in your PyTorch version, ignoring it.")
+            # If verbose was set to True in config, print a message about its behavior
+            if scheduler_config.get('verbose', True):
+                print("Learning rate changes will not be automatically printed. Check metrics for LR changes.")
+        
+        # Create and return the scheduler with all supported parameters
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(**scheduler_kwargs)
     else:
         raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
@@ -925,3 +945,189 @@ def load_checkpoint(filename: str, model: nn.Module, optimizer: Optional[torch.o
 
     # Return the epoch where we left off
     return checkpoint['epoch']
+
+
+# =====================
+# Model Structure Printing Functions
+# =====================
+
+def print_model_structure(model: nn.Module, file: TextIO = sys.stdout, indent: int = 0, depth_first: bool = False) -> None:
+    """
+    Print a detailed hierarchical representation of a PyTorch model's structure.
+    
+    This function prints the model's architecture, showing nested modules, 
+    parameters, shapes, and total parameter counts. The structure can be printed 
+    in breadth-first or depth-first order.
+    
+    Args:
+        model: The PyTorch model to visualize
+        file: File object to write to (default: sys.stdout)
+        indent: Initial indentation level (used for recursive calls)
+        depth_first: Whether to use depth-first traversal (default: False)
+    """
+    # Get total parameter count
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    # Safe printing function to handle encoding issues
+    def safe_print(text, file=file):
+        try:
+            print(text, file=file)
+        except UnicodeEncodeError:
+            # Replace problematic characters with '?'
+            print(text.encode('ascii', 'replace').decode('ascii'), file=file)
+    
+    # Print model class name and parameter summary
+    if indent == 0:
+        safe_print(f"\n{'=' * 80}")
+        safe_print(f"MODEL STRUCTURE: {model.__class__.__name__}")
+        safe_print(f"{'=' * 80}")
+        safe_print(f"Total parameters: {total_params:,}")
+        safe_print(f"Trainable parameters: {trainable_params:,}")
+        safe_print(f"Non-trainable parameters: {total_params - trainable_params:,}")
+        safe_print(f"{'-' * 80}")
+    
+    # Get all direct child modules
+    children = list(model.named_children())
+    
+    # If no children, print parameter details
+    if not children:
+        for name, param in model.named_parameters(recurse=False):
+            shape_str = 'x'.join(str(x) for x in param.shape)
+            safe_print(f"{' ' * indent}├── Parameter {name}: {shape_str} ({param.numel():,} elements)")
+        return
+    
+    # Process each child module
+    for i, (name, child) in enumerate(children):
+        # Get child parameter count
+        child_params = sum(p.numel() for p in child.parameters())
+        
+        # Determine prefix based on position
+        if i == len(children) - 1:
+            prefix = '└──'
+            next_indent = indent + 4
+        else:
+            prefix = '├──'
+            next_indent = indent + 4
+        
+        # Print child module info
+        child_modules = sum(1 for _ in child.modules()) - 1  # -1 to not count self
+        safe_print(f"{' ' * indent}{prefix} {name} ({child.__class__.__name__}): {child_params:,} params, {child_modules} sub-modules")
+        
+        # Recursively print nested modules (either immediately for depth-first, or after siblings for breadth-first)
+        if depth_first:
+            print_model_structure(child, file, next_indent, depth_first)
+    
+    # Process children breadth-first after all direct children are listed
+    if not depth_first:
+        for i, (name, child) in enumerate(children):
+            next_indent = indent + 4
+            print_model_structure(child, file, next_indent, depth_first)
+
+
+def get_model_summary_string(model: nn.Module, input_shape: tuple = None, depth_first: bool = False) -> str:
+    """
+    Generate a string representation of the model structure.
+    
+    Args:
+        model: The PyTorch model to summarize
+        input_shape: Optional input shape to calculate output shapes (e.g., (1, 31, 500, 500))
+        depth_first: Whether to use depth-first traversal (default: False)
+        
+    Returns:
+        String representation of the model structure
+    """
+    import io
+    
+    # Create a string buffer to capture the output
+    buffer = io.StringIO()
+    
+    # Print model structure to the buffer
+    print_model_structure(model, buffer, depth_first=depth_first)
+    
+    # Add input/output shape information if provided
+    if input_shape is not None:
+        try:
+            # Create a dummy input tensor
+            device = next(model.parameters()).device
+            dummy_input = torch.zeros(input_shape).to(device)
+            
+            # Temporarily disable gradient computation for efficiency
+            with torch.no_grad():
+                output = model(dummy_input)
+            
+            # Add input/output information
+            buffer.write(f"\n{'-' * 80}\n")
+            buffer.write(f"Input shape: {input_shape}\n")
+            buffer.write(f"Output shape: {tuple(output.shape)}\n")
+            buffer.write(f"{'-' * 80}\n")
+        except Exception as e:
+            buffer.write(f"\nError calculating output shape: {str(e)}\n")
+    
+    # Get the buffer content as a string
+    result = buffer.getvalue()
+    buffer.close()
+    
+    return result
+
+
+def save_model_structure(model: nn.Module, filename: str, input_shape: tuple = None, depth_first: bool = False) -> None:
+    """
+    Save the model structure to a text file.
+    
+    Args:
+        model: The PyTorch model to save
+        filename: Path to save the structure information
+        input_shape: Optional input shape to calculate output shapes
+        depth_first: Whether to use depth-first traversal (default: False)
+    """
+    try:
+        # Try with UTF-8 encoding first
+        with open(filename, 'w', encoding='utf-8') as f:
+            # Print model structure to the file
+            print_model_structure(model, f, depth_first=depth_first)
+            
+            # Add input/output shape information if provided
+            if input_shape is not None:
+                try:
+                    # Create a dummy input tensor
+                    device = next(model.parameters()).device
+                    dummy_input = torch.zeros(input_shape).to(device)
+                    
+                    # Temporarily disable gradient computation for efficiency
+                    with torch.no_grad():
+                        output = model(dummy_input)
+                    
+                    # Add input/output information
+                    f.write(f"\n{'-' * 80}\n")
+                    f.write(f"Input shape: {input_shape}\n")
+                    f.write(f"Output shape: {tuple(output.shape)}\n")
+                    f.write(f"{'-' * 80}\n")
+                except Exception as e:
+                    f.write(f"\nError calculating output shape: {str(e)}\n")
+    except UnicodeEncodeError:
+        # If UTF-8 fails, try with ASCII encoding and replace problematic characters
+        with open(filename, 'w', encoding='ascii', errors='replace') as f:
+            # Print model structure to the file
+            print_model_structure(model, f, depth_first=depth_first)
+            
+            # Add input/output shape information if provided
+            if input_shape is not None:
+                try:
+                    # Create a dummy input tensor
+                    device = next(model.parameters()).device
+                    dummy_input = torch.zeros(input_shape).to(device)
+                    
+                    # Temporarily disable gradient computation for efficiency
+                    with torch.no_grad():
+                        output = model(dummy_input)
+                    
+                    # Add input/output information
+                    f.write(f"\n{'-' * 80}\n")
+                    f.write(f"Input shape: {input_shape}\n")
+                    f.write(f"Output shape: {tuple(output.shape)}\n")
+                    f.write(f"{'-' * 80}\n")
+                except Exception as e:
+                    f.write(f"\nError calculating output shape: {str(e)}\n")
+    
+    print(f"Model structure saved to {filename}")

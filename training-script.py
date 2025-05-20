@@ -1,11 +1,9 @@
-
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import time
 from tqdm import tqdm
@@ -15,15 +13,20 @@ import json
 import argparse
 import csv
 import shutil
+import matplotlib.pyplot as plt
 
 from base import (
     Generator, Discriminator,
     PerceptualLoss, SSIMLoss,
-    init_weights, get_scheduler, save_checkpoint
+    init_weights, get_scheduler, save_checkpoint,
+    print_model_structure, get_model_summary_string, save_model_structure
 )
 from hsi_octa_dataset_cropped import HSI_OCTA_Dataset_Cropped
 from config_utils import load_config, setup_directories, validate_directories
-from visualization_utils import save_sample_visualizations
+from visualization_utils import (
+    save_sample_visualizations, save_loss_plots, 
+    log_metrics, save_image_grid
+)
 
 
 # Custom JSON encoder to handle Path objects
@@ -109,11 +112,15 @@ class Trainer:
         print(f"Created experiment directory: {self.exp_dir}")
 
         # Modify output paths to be within the experiment directory
-        for key in ['checkpoint_dir', 'results_dir', 'tensorboard_dir', 'visualization_dir']:
+        for key in ['checkpoint_dir', 'results_dir', 'visualization_dir']:
             if key in self.config['output']:
                 orig_name = Path(self.config['output'][key]).name
                 self.config['output'][key] = self.exp_dir / orig_name
 
+        # Create logs directory
+        self.log_dir = self.exp_dir / 'logs'
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        
         setup_directories(self.config)
         validate_directories(self.config)
 
@@ -131,6 +138,30 @@ class Trainer:
         # Initialize weights
         init_weights(self.generator)
         init_weights(self.discriminator)
+        
+        # Print and save model structures
+        print("\nGenerator Architecture:")
+        print_model_structure(self.generator)
+        
+        print("\nDiscriminator Architecture:")
+        print_model_structure(self.discriminator)
+        
+        # Save model structures to files
+        generator_structure_path = self.exp_dir / 'generator_structure.txt'
+        discriminator_structure_path = self.exp_dir / 'discriminator_structure.txt'
+        
+        # Save with input shape information
+        save_model_structure(
+            self.generator, 
+            generator_structure_path, 
+            input_shape=(1, self.config['model']['spectral_channels'], self.config['data']['target_size'], self.config['data']['target_size'])
+        )
+        
+        save_model_structure(
+            self.discriminator, 
+            discriminator_structure_path, 
+            input_shape=(1, 1, self.config['data']['target_size'], self.config['data']['target_size'])
+        )
 
         # Setup data normalization
         self.transform = transforms.Compose([
@@ -161,13 +192,15 @@ class Trainer:
         self.scheduler_G = get_scheduler(self.optimizer_G, self.config)
         self.scheduler_D = get_scheduler(self.optimizer_D, self.config)
 
-        # Setup tensorboard
-        self.writer = SummaryWriter(str(self.config['output']['tensorboard_dir']))
-
-        # Add experiment info to tensorboard
-        self.writer.add_text('Experiment/ID', self.exp_id, 0)
-        self.writer.add_text('Experiment/Config', str(self.config), 0)
-        self.writer.add_text('Experiment/CircleCrop', str(use_circle_crop), 0)
+        # Add experiment info to log file
+        with open(self.log_dir / 'experiment_info.txt', 'w') as f:
+            f.write(f"Experiment ID: {self.exp_id}\n")
+            f.write(f"Config file: {config_path}\n")
+            f.write(f"Circle crop: {use_circle_crop}\n")
+            f.write(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Device: {self.device}\n\n")
+            f.write("Configuration:\n")
+            f.write(json.dumps(self.config, indent=2, cls=PathEncoder))
 
         # Save configuration to the experiment directory using the custom encoder
         with open(self.exp_dir / 'config.json', 'w') as f:
@@ -439,21 +472,22 @@ class Trainer:
         avg_ssim_loss_weighted = sum(self.epoch_losses['ssim_loss_weighted']) / len(
             self.epoch_losses['ssim_loss_weighted']) if self.epoch_losses['ssim_loss_weighted'] else 0
 
-        # Log epoch averages to TensorBoard
-        self.writer.add_scalar('Train/G_loss', avg_g_loss, epoch)
-        self.writer.add_scalar('Train/D_loss', avg_d_loss, epoch)
-
-        # Log component losses
-        self.writer.add_scalar('Train/GAN_loss', avg_gan_loss, epoch)
-        self.writer.add_scalar('Train/Pixel_loss', avg_pixel_loss, epoch)
-        self.writer.add_scalar('Train/Perceptual_loss', avg_perceptual_loss, epoch)
-        self.writer.add_scalar('Train/SSIM_loss', avg_ssim_loss, epoch)
-
-        # Log weighted component losses
-        self.writer.add_scalar('Train/GAN_loss_weighted', avg_gan_loss_weighted, epoch)
-        self.writer.add_scalar('Train/Pixel_loss_weighted', avg_pixel_loss_weighted, epoch)
-        self.writer.add_scalar('Train/Perceptual_loss_weighted', avg_perceptual_loss_weighted, epoch)
-        self.writer.add_scalar('Train/SSIM_loss_weighted', avg_ssim_loss_weighted, epoch)
+        # Log metrics to json/text files
+        training_metrics = {
+            'g_loss_total': avg_g_loss,
+            'd_loss': avg_d_loss,
+            'gan_loss_unweighted': avg_gan_loss,
+            'pixel_loss_unweighted': avg_pixel_loss,
+            'perceptual_loss_unweighted': avg_perceptual_loss,
+            'ssim_loss_unweighted': avg_ssim_loss,
+            'gan_loss_weighted': avg_gan_loss_weighted,
+            'pixel_loss_weighted': avg_pixel_loss_weighted,
+            'perceptual_loss_weighted': avg_perceptual_loss_weighted,
+            'ssim_loss_weighted': avg_ssim_loss_weighted,
+            'learning_rate': self.optimizer_G.param_groups[0]['lr']
+        }
+        
+        log_metrics(training_metrics, self.log_dir, epoch, is_training=True)
 
         # Update the CSV with this epoch's metrics (validation loss will be added later if available)
         metrics_dict = {
@@ -496,7 +530,12 @@ class Trainer:
                 total_val_loss += val_loss.item()
 
             avg_val_loss = total_val_loss / len(self.val_loader)
-            self.writer.add_scalar('Validation/Loss', avg_val_loss, epoch)
+            
+            # Log validation metrics to json/text files
+            validation_metrics = {
+                'val_loss': avg_val_loss
+            }
+            log_metrics(validation_metrics, self.log_dir, epoch, is_training=False)
 
             # Ensure val_loss list is populated correctly
             if 'val_loss' not in self.metrics_history:
@@ -592,9 +631,17 @@ class Trainer:
 
             # Count generator parameters
             gen_params = sum(p.numel() for p in self.generator.parameters())
+            gen_trainable_params = sum(p.numel() for p in self.generator.parameters() if p.requires_grad)
             disc_params = sum(p.numel() for p in self.discriminator.parameters())
-            f.write(f"Generator parameters: {gen_params:,}\n")
-            f.write(f"Discriminator parameters: {disc_params:,}\n\n")
+            disc_trainable_params = sum(p.numel() for p in self.discriminator.parameters() if p.requires_grad)
+            
+            f.write(f"Generator parameters: {gen_params:,} (trainable: {gen_trainable_params:,})\n")
+            f.write(f"Discriminator parameters: {disc_params:,} (trainable: {disc_trainable_params:,})\n")
+            f.write(f"Total parameters: {gen_params + disc_params:,}\n\n")
+            
+            # Include paths to the saved model structure files
+            f.write(f"Generator structure file: {self.exp_dir / 'generator_structure.txt'}\n")
+            f.write(f"Discriminator structure file: {self.exp_dir / 'discriminator_structure.txt'}\n\n")
 
             # Write training parameters
             f.write("TRAINING PARAMETERS\n")
@@ -649,7 +696,7 @@ class Trainer:
             f.write("-" * 50 + "\n")
             f.write(f"Base directory: {self.exp_dir}\n")
             f.write(f"Checkpoints: {self.config['output']['checkpoint_dir']}\n")
-            f.write(f"TensorBoard logs: {self.config['output']['tensorboard_dir']}\n")
+            f.write(f"Logs: {self.log_dir}\n")
             f.write(f"CSV metrics: {self.csv_path}\n")
             f.write(
                 f"Visual samples: {self.config['output'].get('visualization_dir', self.exp_dir / 'visual_samples')}\n\n")
@@ -698,6 +745,7 @@ class Trainer:
         print(f"Starting training for {self.config['num_epochs']} epochs")
         print(f"Checkpoints will be saved to {self.config['output']['checkpoint_dir']}")
         print(f"Training metrics will be logged to {self.csv_path}")
+        print(f"Detailed logs will be saved to {self.log_dir}")
 
         # Create a directory for visual samples
         vis_dir = self.exp_dir / 'visual_samples'
@@ -722,9 +770,10 @@ class Trainer:
                     generator=self.generator,
                     val_loader=self.val_loader,
                     device=self.device,
-                    writer=self.writer,
                     epoch=epoch,
-                    output_dir=vis_dir
+                    output_dir=vis_dir,
+                    log_dir=self.log_dir,
+                    num_samples=3
                 )
 
             # Validate
@@ -810,7 +859,6 @@ class Trainer:
                     self.early_stop_counter = 0
 
             # Update learning rate
-            # Update learning rate
             if isinstance(self.scheduler_G, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 # For ReduceLROnPlateau, we need validation loss
                 if val_loss is not None:
@@ -825,7 +873,9 @@ class Trainer:
                 self.scheduler_G.step()
                 self.scheduler_D.step()
 
-
+            # Generate loss plots periodically
+            if epoch % 10 == 0 or epoch == self.config['num_epochs'] - 1:
+                save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
 
             # Print epoch summary
             epoch_time = time.time() - start_time
@@ -845,13 +895,17 @@ class Trainer:
         # Generate and save final training summary
         summary_path = self.generate_training_summary(total_training_time, reason="final")
 
+        # Generate final plots
+        save_loss_plots(self.metrics_history, self.exp_dir / 'plots', self.log_dir)
+
         # Final cleanup
-        self.writer.close()
         print("\nTraining completed!")
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Model checkpoints saved in: {self.config['output']['checkpoint_dir']}")
         print(f"Training metrics saved to: {self.csv_path}")
         print(f"Training summary saved to: {summary_path}")
+        print(f"Plots saved in: {self.exp_dir / 'plots'}")
+        print(f"Detailed logs saved in: {self.log_dir}")
         print(f"All experiment files saved in: {self.exp_dir}")
 
 
