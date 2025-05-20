@@ -248,20 +248,21 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
         'learning_rate': []
     }
     
-    # Setup experiment name with timestamp and model size
-    # Format: MMDD_HHMMSS_test_modelSize (month, day, hour, minute, second, test indicator, model size)
-    timestamp = datetime.now().strftime("%m%d_%H%M%S")
-    model_size = config.get('model', {}).get('size', 'medium')
-    exp_id = f"{timestamp}_test_{model_size}"
-    
-    # Load configuration
+    # Load configuration first
     config = load_config(config_path)
     
-    # Print model size
+    # Get model size from config
     model_size = config.get('model', {}).get('size', 'medium')
+    
+    # Print model size
     print(f"\n{'='*50}")
     print(f"RUNNING TEST WITH MODEL SIZE: {model_size.upper()}")
     print(f"{'='*50}\n")
+    
+    # Setup experiment name with timestamp and model size
+    # Format: MMDD_HHMMSS_test_modelSize (month, day, hour, minute, second, test indicator, model size)
+    timestamp = datetime.now().strftime("%m%d_%H%M%S")
+    exp_id = f"{timestamp}_test_{model_size}"
     
     # Create mini dataset CSV
     original_csv_path = config.get('data', {}).get('approved_csv_path', '')
