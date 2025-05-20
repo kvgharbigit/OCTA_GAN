@@ -482,8 +482,8 @@ def run_mini_test(config_path, num_samples=10, use_circle_crop=True):
     metrics_history['ssim_loss_weighted'].append(avg_ssim_loss_weighted)
     metrics_history['learning_rate'].append(optimizer_G.param_groups[0]['lr'])
     
-    # Generate and update the loss plots
-    update_loss_plots(metrics_history, exp_dir, log_dir)
+    # Generate and update the loss plots using the main pipeline function
+    save_loss_plots(metrics_history, exp_dir / 'plots', log_dir)
     
     # Log losses to a file
     with open(log_dir / 'training_log.txt', 'w') as f:
