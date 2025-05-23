@@ -235,7 +235,8 @@ def save_loss_plots(metrics_history, output_dir, log_dir=None):
     # Plot validation loss
     if 'val_loss' in metrics_history and metrics_history['val_loss']:
         plt.figure(figsize=(12, 8))
-        plt.plot(metrics_history['epoch'], metrics_history['val_loss'], label='Validation Loss')
+        val_epochs = [ep for i, ep in enumerate(metrics_history['epoch']) if i < len(metrics_history['val_loss'])]
+        plt.plot(val_epochs, metrics_history['val_loss'], label='Validation Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Validation Loss')

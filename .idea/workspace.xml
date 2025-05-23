@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="MODULAR RESTRUCTURE - augs">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/visualization_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/visualization_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -40,7 +40,6 @@
   &quot;associatedIndex&quot;: 8
 }</component>
   <component name="ProjectId" id="2tN08BWNSOX4Cnpa2H4OrTba2YQ" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
