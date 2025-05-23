@@ -17,8 +17,8 @@
     "// Loss Weights": null,
     "lambda_pixel": 2,
     "lambda_perceptual": 0,
-    "lambda_ssim": 2,
-    "lambda_adv": 5,
+    "lambda_ssim": 1,
+    "lambda_adv": 1,
 
     "// Data Parameters": null,
     "data": {
