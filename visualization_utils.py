@@ -99,20 +99,56 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
     # Use mixed precision for visualization generation, but with updated API
     with torch.no_grad():
         # Use standard precision for visualization to avoid type mismatches
-        # Take samples from the validation loader
-        hsi_batch, octa_batch, patient_ids = next(iter(val_loader))
+        # Create a data iterator to get samples
+        val_iterator = iter(val_loader)
         
-        # Ensure we don't exceed batch size
-        num_samples = min(num_samples, len(hsi_batch))
+        # Collect enough samples
+        hsi_samples = []
+        octa_samples = []
+        patient_id_samples = []
         
-        # Create a figure with multiple rows for each sample
-        plt.figure(figsize=(15, 5 * num_samples))
+        # Collect requested number of samples, potentially from multiple batches
+        samples_needed = num_samples
+        while samples_needed > 0:
+            try:
+                hsi_batch, octa_batch, patient_ids = next(val_iterator)
+                
+                # Take as many samples as needed from this batch
+                samples_to_take = min(samples_needed, len(hsi_batch))
+                
+                hsi_samples.append(hsi_batch[:samples_to_take])
+                octa_samples.append(octa_batch[:samples_to_take])
+                patient_id_samples.extend(patient_ids[:samples_to_take])
+                
+                samples_needed -= samples_to_take
+                
+            except StopIteration:
+                # If we run out of batches, restart the iterator
+                val_iterator = iter(val_loader)
+                # If we couldn't get enough samples, just use what we have
+                if samples_needed > 0:
+                    print(f"Warning: Could only collect {num_samples - samples_needed} samples for visualization instead of {num_samples}")
+                break
+        
+        # Concatenate all collected samples
+        if len(hsi_samples) > 0:
+            hsi_batch = torch.cat(hsi_samples, dim=0)
+            octa_batch = torch.cat(octa_samples, dim=0)
+            
+            # Make sure we have the right number of samples
+            num_samples = len(hsi_batch)
+            
+            # Create a figure with multiple rows for each sample
+            plt.figure(figsize=(15, 5 * num_samples))
+        else:
+            print("Error: No samples could be collected for visualization")
+            return
 
         for i in range(num_samples):
             # Get a single sample - process one at a time to save memory
             hsi = hsi_batch[i:i+1].to(device, non_blocking=True)
             octa = octa_batch[i:i+1].to(device, non_blocking=True)
-            patient_id = patient_ids[i]
+            patient_id = patient_id_samples[i]
 
             # Generate fake OCTA image
             fake_octa = generator(hsi)
