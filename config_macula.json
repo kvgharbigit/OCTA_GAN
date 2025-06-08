@@ -42,7 +42,7 @@
 
     "// Preprocessing": null,
     "preprocessing": {
-        "circle_crop": false,
+        "circle_crop": true,
         "crop_padding": 0
     },
 
@@ -71,12 +71,12 @@
         "spectral_channels": 31,
         "size": "small",
         "generator": {
-            "initial_filters": 32,
-            "max_filters": 128
+            "initial_filters": 16,
+            "max_filters": 64
         },
         "discriminator": {
-            "initial_filters": 64,
-            "max_filters": 512
+            "initial_filters": 32,
+            "max_filters": 128
         }
     },
 
@@ -116,5 +116,12 @@
         "perceptual_enabled": false,
         "ssim_enabled": true,
         "adversarial_enabled": true
+    },
+
+    "// Resource Estimates": null,
+    "resource_estimates": {
+        "cpu_ram": "~4-6 GB",
+        "gpu_vram": "~4-5 GB (GTX 1080 or better recommended)",
+        "training_time": "~10-12 hours for 150 epochs on modern GPU"
     }
 }
