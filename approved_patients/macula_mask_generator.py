@@ -3,8 +3,8 @@
 Script to create masked versions of RetinaEnface TIFF files by applying
 a macula mask based on HSI data.
 
-The mask is created by finding all spatial pixels where the average value
-across all wavelengths is <0.000001 (these pixels are 0 in the mask, all others are 1).
+The mask is created by finding all spatial pixels where the value at the 10th wavelength
+is <0.001 (these pixels are 0 in the mask, all others are 1).
 """
 
 import os
@@ -24,14 +24,14 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula.csv")
 NEW_CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula_masked.csv")
 
-def generate_mask_from_hsi(hsi_path, threshold=0.000001, save_mask=True):
+def generate_mask_from_hsi(hsi_path, threshold=0.001, save_mask=True):
     """
-    Generate a binary mask from HSI data where pixels with average value
-    across all wavelengths < threshold are 0, all others are 1.
+    Generate a binary mask from HSI data where pixels with value at the 10th wavelength
+    < threshold are 0, all others are 1.
     
     Args:
         hsi_path: Path to the HSI .h5 file
-        threshold: Threshold value for masking
+        threshold: Threshold value for masking (default: 0.001)
         save_mask: Whether to save the mask as an image for visualization
         
     Returns:
@@ -109,38 +109,45 @@ def generate_mask_from_hsi(hsi_path, threshold=0.000001, save_mask=True):
             
             print(f"HSI data shape: {hsi_data.shape}")
             
-            # Handle different data shapes
+            # Handle different data shapes to extract 10th wavelength
             if len(hsi_data.shape) == 2:
-                # Already a 2D array, use as is
-                print("Data is already 2D, using directly")
-                mean_data = hsi_data
+                # Already a 2D array, use as is (can't get 10th wavelength)
+                print("Warning: Data is already 2D, cannot extract 10th wavelength, using as is")
+                wavelength_data = hsi_data
             elif len(hsi_data.shape) == 3:
                 # 3D array, need to determine which dimension is spectral
                 # Heuristic: smallest dimension is likely spectral
-                smallest_dim = np.argmin(hsi_data.shape)
-                print(f"Using dimension {smallest_dim} as spectral dimension")
+                spectral_dim = np.argmin(hsi_data.shape)
+                print(f"Using dimension {spectral_dim} as spectral dimension")
                 
-                # Average across the spectral dimension
-                mean_data = np.mean(hsi_data, axis=smallest_dim)
+                # Determine the number of wavelengths
+                num_wavelengths = hsi_data.shape[spectral_dim]
+                print(f"Number of wavelengths: {num_wavelengths}")
                 
-                # Ensure result is 2D
-                if len(mean_data.shape) != 2:
-                    print(f"Warning: After averaging, result shape is {mean_data.shape}")
-                    if len(mean_data.shape) == 3 and mean_data.shape[0] == 1:
-                        mean_data = mean_data[0]  # Extract the single slice
-                    elif len(mean_data.shape) == 1:
-                        # 1D result, cannot create mask
-                        print("Cannot create 2D mask from 1D data")
-                        return None
+                # Use 10th wavelength if available, otherwise use middle wavelength
+                wavelength_index = 9  # 0-indexed, so 9 is the 10th wavelength
+                if wavelength_index >= num_wavelengths:
+                    print(f"Warning: 10th wavelength not available, using middle wavelength instead")
+                    wavelength_index = num_wavelengths // 2
+                
+                print(f"Using wavelength index: {wavelength_index}")
+                
+                # Extract the specified wavelength
+                if spectral_dim == 0:
+                    wavelength_data = hsi_data[wavelength_index, :, :]
+                elif spectral_dim == 1:
+                    wavelength_data = hsi_data[:, wavelength_index, :]
+                else:  # spectral_dim == 2
+                    wavelength_data = hsi_data[:, :, wavelength_index]
             else:
                 print(f"Cannot handle data with shape {hsi_data.shape}")
                 return None
             
-            print(f"Mean data shape: {mean_data.shape}")
-            print(f"Min value: {np.min(mean_data)}, Max value: {np.max(mean_data)}")
+            print(f"Wavelength data shape: {wavelength_data.shape}")
+            print(f"Min value: {np.min(wavelength_data)}, Max value: {np.max(wavelength_data)}")
             
-            # Create the binary mask (1 where mean >= threshold, 0 otherwise)
-            mask = (mean_data >= threshold).astype(np.uint8)
+            # Create the binary mask (1 where value >= threshold, 0 otherwise)
+            mask = (wavelength_data >= threshold).astype(np.uint8)
             print(f"Mask shape: {mask.shape}, Sum of mask: {np.sum(mask)}")
             print(f"Percentage of non-zero pixels: {np.sum(mask) / mask.size * 100:.2f}%")
             
@@ -152,7 +159,7 @@ def generate_mask_from_hsi(hsi_path, threshold=0.000001, save_mask=True):
                 
                 plt.figure(figsize=(10, 10))
                 plt.imshow(mask, cmap='gray')
-                plt.title(f"Macula Mask (threshold={threshold})")
+                plt.title(f"Macula Mask (10th wavelength, threshold={threshold})")
                 plt.colorbar()
                 plt.savefig(mask_path)
                 plt.close()
@@ -381,7 +388,7 @@ def main():
     parser.add_argument('--single', action='store_true', help='Process a single sample for testing')
     parser.add_argument('--hsi', type=str, help='Path to a single HSI file (required if --single is used)')
     parser.add_argument('--tiff', type=str, help='Path to a single TIFF file (required if --single is used)')
-    parser.add_argument('--threshold', type=float, default=0.000001, help='Threshold value for masking (default: 0.000001)')
+    parser.add_argument('--threshold', type=float, default=0.001, help='Threshold value for 10th wavelength masking (default: 0.001)')
     
     args = parser.parse_args()
     
