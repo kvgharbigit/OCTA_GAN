@@ -1396,14 +1396,14 @@ if __name__ == '__main__':
             print(f"Adversarial loss: {trainer.config['lambda_adv']}")
 
         # Check for resume in command line args (priority) or config
-        resume_path = args.resume
-        if not resume_path:
-            # Check if resume is specified in config
-            resume_config = trainer.config.get('resume', {})
-            resume_enabled = resume_config.get('enabled', False)
-            resume_path = resume_config.get('checkpoint_path', None)
-            if not (resume_enabled and resume_path):
-                resume_path = None
+    resume_path = args.resume
+    if not resume_path:
+        # Check if resume is specified in config
+        resume_config = trainer.config.get('resume', {})
+        resume_enabled = resume_config.get('enabled', False)
+        resume_path = resume_config.get('checkpoint_path', None)
+        if not (resume_enabled and resume_path):
+            resume_path = None
 
         # Resume training if a checkpoint path is available
         if resume_path:
