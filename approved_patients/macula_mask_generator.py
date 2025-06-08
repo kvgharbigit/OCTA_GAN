@@ -4,7 +4,7 @@ Script to create masked versions of RetinaEnface TIFF files by applying
 a macula mask based on HSI data.
 
 The mask is created by finding all spatial pixels where the average value
-across all wavelengths is <0.0001 (these pixels are 0 in the mask, all others are 1).
+across all wavelengths is <0.000001 (these pixels are 0 in the mask, all others are 1).
 """
 
 import os
@@ -24,7 +24,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula.csv")
 NEW_CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula_masked.csv")
 
-def generate_mask_from_hsi(hsi_path, threshold=0.0001, save_mask=True):
+def generate_mask_from_hsi(hsi_path, threshold=0.000001, save_mask=True):
     """
     Generate a binary mask from HSI data where pixels with average value
     across all wavelengths < threshold are 0, all others are 1.
@@ -381,7 +381,7 @@ def main():
     parser.add_argument('--single', action='store_true', help='Process a single sample for testing')
     parser.add_argument('--hsi', type=str, help='Path to a single HSI file (required if --single is used)')
     parser.add_argument('--tiff', type=str, help='Path to a single TIFF file (required if --single is used)')
-    parser.add_argument('--threshold', type=float, default=0.0001, help='Threshold value for masking (default: 0.0001)')
+    parser.add_argument('--threshold', type=float, default=0.000001, help='Threshold value for masking (default: 0.000001)')
     
     args = parser.parse_args()
     
