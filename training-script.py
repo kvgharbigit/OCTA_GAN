@@ -52,10 +52,10 @@ class Trainer:
         self.scaler = None
         if self.use_mixed_precision and torch.cuda.is_available():
             self.scaler = amp.GradScaler()
-            print("✅ Mixed precision training enabled (reduces memory usage by ~50%)")
+            print("[INFO] Mixed precision training enabled (reduces memory usage by ~50%)")
         else:
             if self.use_mixed_precision:
-                print("⚠️ Mixed precision requested but not available - using full precision")
+                print("[WARNING] Mixed precision requested but not available - using full precision")
             self.use_mixed_precision = False
 
         # Initialize dictionary to track losses for epoch averaging
@@ -183,7 +183,20 @@ class Trainer:
             spectral_channels=self.config['model']['spectral_channels'],
             model_size=model_size
         ).to(self.device)
+        
+        # Create standard discriminator
         self.discriminator = Discriminator(model_size=model_size).to(self.device)
+        
+        # If using mixed precision, modify the discriminator to remove the final sigmoid
+        # This is necessary because BCEWithLogitsLoss includes sigmoid internally
+        if self.use_mixed_precision:
+            # Remove the sigmoid layer from the discriminator
+            # The discriminator model is a Sequential, and we need to remove the last layer (sigmoid)
+            model_layers = list(self.discriminator.model)
+            if isinstance(model_layers[-1], nn.Sigmoid):
+                # Create a new model without the sigmoid
+                self.discriminator.model = nn.Sequential(*model_layers[:-1])
+                print("[INFO] Removed sigmoid from discriminator for mixed precision compatibility")
 
         # Initialize weights
         init_weights(self.generator)
@@ -219,8 +232,15 @@ class Trainer:
         ])
 
         # Initialize loss functions
-        # Using BCELoss as in mini test (no mixed precision)
-        self.criterion_gan = nn.BCELoss()
+        # For mixed precision training, use BCEWithLogitsLoss which is numerically stable
+        if self.use_mixed_precision:
+            # BCEWithLogitsLoss is safe for mixed precision (combines sigmoid + BCE)
+            self.criterion_gan = nn.BCEWithLogitsLoss()
+            print("[INFO] Using BCEWithLogitsLoss for mixed precision compatibility")
+        else:
+            # Standard BCE loss when not using mixed precision
+            self.criterion_gan = nn.BCELoss()
+            
         self.criterion_pixel = nn.L1Loss()
         self.criterion_perceptual = PerceptualLoss().to(self.device)
         self.criterion_ssim = SSIMLoss().to(self.device)
@@ -562,6 +582,7 @@ class Trainer:
                 # Pre-allocate labels only once and reuse
                 # This avoids repeatedly allocating new tensors
                 if not hasattr(self, 'real_label') or self.real_label.size(0) != batch_size:
+                    # Use 1.0 for real, 0.0 for fake labels regardless of loss function
                     self.real_label = torch.ones(batch_size, 1, 30, 30, device=self.device)
                     self.fake_label = torch.zeros(batch_size, 1, 30, 30, device=self.device)
 
