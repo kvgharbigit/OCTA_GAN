@@ -1383,8 +1383,8 @@ if __name__ == '__main__':
     # Create trainer instance
     trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
 
-        # Override loss weights if specified
-        if args.loss_weights:
+    # Override loss weights if specified
+    if args.loss_weights:
             trainer.config['lambda_pixel'] = args.loss_weights[0]
             trainer.config['lambda_perceptual'] = args.loss_weights[1]
             trainer.config['lambda_ssim'] = args.loss_weights[2]
