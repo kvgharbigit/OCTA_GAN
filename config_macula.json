@@ -15,7 +15,7 @@
     },
 
     "// Loss Weights": null,
-    "lambda_pixel": 2,
+    "lambda_pixel": 1,
     "lambda_perceptual": 0,
     "lambda_ssim": 1,
     "lambda_adv": 1,
