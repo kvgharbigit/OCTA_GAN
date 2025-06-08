@@ -136,7 +136,7 @@ class Trainer:
 
         print(f"Running experiment: {self.exp_id}")
         print(f"Model size: {model_size}")
-        print(f"Circle cropping: {'enabled' if use_circle_crop else 'disabled'}")
+        print(f"Circle cropping: {'enabled' if self.use_circle_crop else 'disabled'}")
 
         # Create a parent experiment directory (just use the ID as the folder name)
         self.exp_dir = Path(self.config['output']['base_dir']) / f"{self.exp_id}"
@@ -1380,9 +1380,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    try:
-        # Create trainer instance
-        trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
+    # Create trainer instance
+    trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
 
         # Override loss weights if specified
         if args.loss_weights:
