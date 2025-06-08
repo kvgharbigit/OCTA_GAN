@@ -93,7 +93,8 @@
     "logging": {
         "print_interval": 100,
         "save_images_interval": 3,
-        "save_images_interval_start": 0
+        "save_images_interval_start": 0,
+        "num_visualization_samples": 3
     },
 
     "// Hardware Settings": null,

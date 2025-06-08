@@ -1214,6 +1214,8 @@ class Trainer:
                                                                       5)  # Default to 5 if not specified
             save_images_start = self.config.get('logging', {}).get('save_images_interval_start',
                                                                    0)  # Default to 0 if not specified
+            # Get number of visualization samples from config or default to 3
+            num_vis_samples = self.config.get('logging', {}).get('num_visualization_samples', 3)
 
             if epoch >= save_images_start and epoch % save_images_interval == 0:
                 save_sample_visualizations(
@@ -1223,7 +1225,7 @@ class Trainer:
                     epoch=epoch,
                     output_dir=vis_dir,
                     log_dir=self.log_dir,
-                    num_samples=3
+                    num_samples=num_vis_samples
                 )
 
             # Validate
