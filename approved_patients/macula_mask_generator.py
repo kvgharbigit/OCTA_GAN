@@ -44,33 +44,103 @@ def generate_mask_from_hsi(hsi_path, threshold=0.0001, save_mask=True):
             keys = list(f.keys())
             print(f"Available keys in H5 file: {keys}")
             
-            # The data is typically stored as a 3D array (wavelengths, height, width)
-            data_key = None
-            for key in keys:
-                if hasattr(f[key], 'shape'):
-                    shape = f[key].shape
-                    print(f"Key '{key}' has shape {shape}")
-                    if len(shape) == 3:
-                        data_key = key
-                        break
+            # Special handling for 'Cube' key which is common in these files
+            if 'Cube' in keys:
+                # Get attributes and properties of the Cube
+                print("Exploring Cube structure...")
+                cube_obj = f['Cube']
+                if isinstance(cube_obj, h5py.Dataset):
+                    print(f"Cube is a dataset with shape {cube_obj.shape}")
+                    # Check if shape is available and reasonable
+                    if len(cube_obj.shape) >= 2:
+                        hsi_data = cube_obj[:]
+                    else:
+                        print(f"Cube has unexpected shape: {cube_obj.shape}")
+                        return None
+                else:
+                    # Explore inside the cube group
+                    print("Cube is a group, attempting to find data inside it")
+                    # Look for the largest dataset in the file
+                    biggest_dataset = None
+                    biggest_size = 0
+                    
+                    def find_largest_dataset(name, obj):
+                        nonlocal biggest_dataset, biggest_size
+                        if isinstance(obj, h5py.Dataset) and len(obj.shape) >= 2:
+                            size = np.prod(obj.shape)
+                            if size > biggest_size:
+                                biggest_size = size
+                                biggest_dataset = obj
+                    
+                    # Visit all items in the file
+                    f.visititems(find_largest_dataset)
+                    
+                    if biggest_dataset is not None:
+                        print(f"Using largest dataset found with shape {biggest_dataset.shape}")
+                        hsi_data = biggest_dataset[:]
+                    else:
+                        print("Could not find suitable dataset in the file")
+                        return None
+            else:
+                # No 'Cube' key found, try to find any suitable dataset
+                data_key = None
+                max_ndim = 0
+                max_size = 0
+                
+                # Find the dataset with highest dimensionality
+                for key in keys:
+                    if hasattr(f[key], 'shape'):
+                        shape = f[key].shape
+                        ndim = len(shape)
+                        size = np.prod(shape)
+                        
+                        # Prefer higher dimensionality, then larger size
+                        if (ndim > max_ndim) or (ndim == max_ndim and size > max_size):
+                            max_ndim = ndim
+                            max_size = size
+                            data_key = key
+                
+                if data_key:
+                    print(f"Using best dataset found: {data_key} with shape {f[data_key].shape}")
+                    hsi_data = f[data_key][:]
+                else:
+                    print("No suitable dataset found in the file")
+                    return None
             
-            if data_key is None:
-                print(f"Warning: Could not find 3D dataset in {hsi_path}")
-                return None
-            
-            # Load the HSI data
-            print(f"Using data key: {data_key}")
-            hsi_data = f[data_key][:]
             print(f"HSI data shape: {hsi_data.shape}")
             
-            # Calculate the mean across all wavelengths
-            # Assuming the wavelength is the first dimension
-            mean_across_wavelengths = np.mean(hsi_data, axis=0)
-            print(f"Mean data shape: {mean_across_wavelengths.shape}")
-            print(f"Min value: {np.min(mean_across_wavelengths)}, Max value: {np.max(mean_across_wavelengths)}")
+            # Handle different data shapes
+            if len(hsi_data.shape) == 2:
+                # Already a 2D array, use as is
+                print("Data is already 2D, using directly")
+                mean_data = hsi_data
+            elif len(hsi_data.shape) == 3:
+                # 3D array, need to determine which dimension is spectral
+                # Heuristic: smallest dimension is likely spectral
+                smallest_dim = np.argmin(hsi_data.shape)
+                print(f"Using dimension {smallest_dim} as spectral dimension")
+                
+                # Average across the spectral dimension
+                mean_data = np.mean(hsi_data, axis=smallest_dim)
+                
+                # Ensure result is 2D
+                if len(mean_data.shape) != 2:
+                    print(f"Warning: After averaging, result shape is {mean_data.shape}")
+                    if len(mean_data.shape) == 3 and mean_data.shape[0] == 1:
+                        mean_data = mean_data[0]  # Extract the single slice
+                    elif len(mean_data.shape) == 1:
+                        # 1D result, cannot create mask
+                        print("Cannot create 2D mask from 1D data")
+                        return None
+            else:
+                print(f"Cannot handle data with shape {hsi_data.shape}")
+                return None
+            
+            print(f"Mean data shape: {mean_data.shape}")
+            print(f"Min value: {np.min(mean_data)}, Max value: {np.max(mean_data)}")
             
             # Create the binary mask (1 where mean >= threshold, 0 otherwise)
-            mask = (mean_across_wavelengths >= threshold).astype(np.uint8)
+            mask = (mean_data >= threshold).astype(np.uint8)
             print(f"Mask shape: {mask.shape}, Sum of mask: {np.sum(mask)}")
             print(f"Percentage of non-zero pixels: {np.sum(mask) / mask.size * 100:.2f}%")
             
