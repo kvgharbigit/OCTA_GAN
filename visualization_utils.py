@@ -328,8 +328,24 @@ def save_loss_plots(metrics_history, output_dir, log_dir=None):
     # Plot validation loss
     if 'val_loss' in metrics_history and metrics_history['val_loss']:
         plt.figure(figsize=(12, 8))
-        val_epochs = [ep for i, ep in enumerate(metrics_history['epoch']) if i < len(metrics_history['val_loss'])]
-        plt.plot(val_epochs, metrics_history['val_loss'], label='Validation Loss')
+        
+        # Get actual epochs where validation was performed
+        # Filter out empty values (validation not performed)
+        val_loss_values = [v for v in metrics_history['val_loss'] if v != '']
+        
+        # Find which epochs have validation data (typically every N epochs)
+        epochs = metrics_history['epoch']
+        val_epochs = []
+        val_indices = []
+        
+        for i, epoch in enumerate(epochs):
+            # Check if we have validation data for this epoch
+            if i < len(metrics_history['val_loss']) and metrics_history['val_loss'][i] != '':
+                val_epochs.append(epoch)
+                val_indices.append(i)
+        
+        # Plot validation loss at correct epochs
+        plt.plot(val_epochs, val_loss_values, 'ro-', label='Validation Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Validation Loss')
@@ -363,8 +379,17 @@ def save_loss_plots(metrics_history, output_dir, log_dir=None):
         
         # Plot validation loss on same graph for comparison
         if 'val_loss' in metrics_history and metrics_history['val_loss']:
-            val_epochs = epochs[:len(metrics_history['val_loss'])]
-            plt.plot(val_epochs, metrics_history['val_loss'], 'r-', label='Validation Loss')
+            # Get actual epochs where validation was performed
+            val_loss_values = []
+            val_epochs = []
+            
+            for i, epoch in enumerate(epochs):
+                if i < len(metrics_history['val_loss']) and metrics_history['val_loss'][i] != '':
+                    val_epochs.append(epoch)
+                    val_loss_values.append(metrics_history['val_loss'][i])
+            
+            if val_epochs and val_loss_values:
+                plt.plot(val_epochs, val_loss_values, 'ro-', label='Validation Loss', markersize=4)
         
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
