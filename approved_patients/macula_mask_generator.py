@@ -204,31 +204,31 @@ def apply_mask_to_tiff(tiff_path, mask, output_path):
 def process_csv():
     """
     Process the CSV file to create masked versions of all RetinaEnface TIFF files.
-    Also generates a new CSV file with updated paths to the masked files.
+    Also generates a new CSV file that is identical to the original but with masked TIFF paths.
     """
     # Read the CSV file
     rows = []
-    with open(CSV_PATH, 'r') as f:
+    with open(CSV_PATH, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         fieldnames = reader.fieldnames
-        # Add new fields
-        new_fields = ['octa_masked_file', 'mask_file']
-        for field in new_fields:
-            if field not in fieldnames:
-                fieldnames.append(field)
-        
+        # Keep the exact same fieldnames - no new columns
         rows = list(reader)
     
     # Process each row
     print(f"Processing {len(rows)} entries from CSV...")
+    
+    # Create a copy of rows for the new CSV with masked paths
+    new_rows = []
+    
     for row in tqdm(rows):
+        new_row = row.copy()  # Create a copy of the original row
+        
         hsi_path = row['hs_file']
         octa_path = row['octa_file']
         
         if not hsi_path or not octa_path:
             print(f"Warning: Missing HSI or OCTA path for ID {row.get('id', 'unknown')}")
-            row['octa_masked_file'] = ""
-            row['mask_file'] = ""
+            new_rows.append(new_row)  # Add unchanged row to new CSV
             continue
         
         # Generate the output path for the masked TIFF
@@ -238,13 +238,9 @@ def process_csv():
         masked_filename = f"{octa_basename}_masked{octa_ext}"
         masked_path = os.path.join(octa_dir, masked_filename)
         
-        # Generate the path for the mask image
+        # Generate the path for the mask image (for internal use)
         mask_filename = os.path.basename(hsi_path).replace('.h5', '_mask.png')
         mask_path = os.path.join(os.path.dirname(hsi_path), mask_filename)
-        
-        # Store the paths in the row
-        row['octa_masked_file'] = masked_path
-        row['mask_file'] = mask_path
         
         # Generate the mask from HSI data
         print(f"\nProcessing entry {row['id_full']}:")
@@ -253,17 +249,24 @@ def process_csv():
         if mask is not None:
             # Apply the mask to the TIFF file
             success = apply_mask_to_tiff(octa_path, mask, masked_path)
-            if not success:
+            if success:
+                # Replace the original OCTA path with the masked path ONLY in the new CSV
+                new_row['octa_file'] = masked_path
+                print(f"Updated CSV entry to use masked file: {masked_path}")
+            else:
                 print(f"Failed to create masked file for {octa_path}")
+        
+        # Add the modified row to our new list
+        new_rows.append(new_row)
         
         # Add a small delay to allow for viewing console output
         time.sleep(0.5)
     
-    # Write the updated CSV
-    with open(NEW_CSV_PATH, 'w', newline='') as f:
+    # Write the new CSV with masked TIFF paths - ensure proper encoding and line endings
+    with open(NEW_CSV_PATH, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(new_rows)
     
     print(f"Created new CSV file: {NEW_CSV_PATH}")
 
