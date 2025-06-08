@@ -19,8 +19,10 @@ import time
 
 # Paths
 BASE_DIR = r"Z:\Projects\Ophthalmic neuroscience\Projects\Control Database 2024\Kayvan_experiments\kayvan_octa_macula_updated"
-CSV_PATH = r"C:\Users\kvgha\AI_Projects\OCTA_GAN\approved_patients\approved_participants_macula.csv"
-NEW_CSV_PATH = r"C:\Users\kvgha\AI_Projects\OCTA_GAN\approved_patients\approved_participants_macula_masked.csv"
+# Use local path for the CSV files
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula.csv")
+NEW_CSV_PATH = os.path.join(SCRIPT_DIR, "approved_participants_macula_masked.csv")
 
 def generate_mask_from_hsi(hsi_path, threshold=0.0001, save_mask=True):
     """
