@@ -2,7 +2,6 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
-import torch.cuda.amp as amp  # Add automatic mixed precision support
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from pathlib import Path
@@ -51,7 +50,8 @@ class Trainer:
         self.use_mixed_precision = self.config.get('memory_optimization', {}).get('use_amp', False)
         self.scaler = None
         if self.use_mixed_precision and torch.cuda.is_available():
-            self.scaler = amp.GradScaler()
+            # Use torch.cuda.amp.GradScaler for handling mixed precision gradients
+            self.scaler = torch.cuda.amp.GradScaler()
             print("[INFO] Mixed precision training enabled (reduces memory usage by ~50%)")
         else:
             if self.use_mixed_precision:
@@ -588,7 +588,8 @@ class Trainer:
 
                 # Generate fake image (with mixed precision if enabled)
                 if self.use_mixed_precision:
-                    with amp.autocast():
+                    # Use new autocast syntax
+                    with torch.cuda.amp.autocast():
                         fake_octa = self.generator(hsi)
                         
                         # Real loss
@@ -641,7 +642,7 @@ class Trainer:
                 d_loss = torch.tensor(0.0, device=self.device)
                 # Still need to generate fake OCTA for the generator training
                 if self.use_mixed_precision:
-                    with amp.autocast():
+                    with torch.cuda.amp.autocast():
                         fake_octa = self.generator(hsi)
                 else:
                     fake_octa = self.generator(hsi)
@@ -651,7 +652,7 @@ class Trainer:
 
             # Apply mixed precision for generator training if enabled
             if self.use_mixed_precision:
-                with amp.autocast():
+                with torch.cuda.amp.autocast():
                     # Compute fake discriminator output
                     fake_output = self.discriminator(fake_octa)
                     
@@ -879,19 +880,24 @@ class Trainer:
                 hsi = hsi.to(self.device, non_blocking=True)  # Non-blocking transfer
                 octa = octa.to(self.device, non_blocking=True)
 
-                # Generate fake OCTA images
+                # For validation with mixed precision, we need to be careful about type mismatches
                 if self.use_mixed_precision:
-                    with amp.autocast():
+                    # First generate the fake output with autocast
+                    with torch.cuda.amp.autocast():
                         fake_octa = self.generator(hsi)
-                        
-                        # Calculate individual validation losses
-                        val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
-                        val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
-                        val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
+                    
+                    # Then cast back to float32 for loss calculation to avoid type mismatches
+                    fake_octa = fake_octa.float()
+                    
+                    # Now calculate losses in float32 precision
+                    val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
+                    val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
+                    val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
                 else:
+                    # Standard precision validation
                     fake_octa = self.generator(hsi)
                     
-                    # Standard precision validation
+                    # Calculate losses
                     val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
                     val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
                     val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
@@ -903,8 +909,15 @@ class Trainer:
                     batch_size = hsi.size(0)
                     real_label = torch.ones(batch_size, 1, 30, 30, device=self.device)
                     
-                    # Get discriminator output for fake images
-                    fake_output = self.discriminator(fake_octa)
+                    # For mixed precision, ensure everything is float32 for the discriminator
+                    if self.use_mixed_precision:
+                        # Make sure fake_octa is float32 for the discriminator
+                        # This avoids the "Input type (struct c10::Half) and bias type (float)" error
+                        fake_output = self.discriminator(fake_octa.float())
+                    else:
+                        # Standard precision
+                        fake_output = self.discriminator(fake_octa)
+                        
                     val_gan_loss = self.criterion_gan(fake_output, real_label)
                 
                 # Combine losses with the same weights used in training

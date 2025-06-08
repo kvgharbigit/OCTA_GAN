@@ -96,8 +96,9 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         log_dir = Path(log_dir)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use mixed precision for visualization generation
-    with torch.no_grad(), torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
+    # Use mixed precision for visualization generation, but with updated API
+    with torch.no_grad():
+        # Use standard precision for visualization to avoid type mismatches
         # Take samples from the validation loader
         hsi_batch, octa_batch, patient_ids = next(iter(val_loader))
         

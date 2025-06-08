@@ -42,7 +42,7 @@
 
     "// Preprocessing": null,
     "preprocessing": {
-        "circle_crop": true,
+        "circle_crop": false,
         "crop_padding": 0
     },
 
