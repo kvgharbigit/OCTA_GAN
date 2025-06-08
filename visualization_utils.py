@@ -88,6 +88,13 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         log_dir (Path, optional): Directory to save log files
         num_samples (int, optional): Number of samples to visualize
     """
+    print(f"\n==== Visualization Debug ====")
+    print(f"Epoch: {epoch}")
+    print(f"Requested samples: {num_samples}")
+    print(f"Validation loader batch size: {val_loader.batch_size}")
+    print(f"Validation dataset size: {len(val_loader.dataset)}")
+    print(f"Output directory: {output_dir}")
+    
     generator.eval()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -102,6 +109,8 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         # Create a data iterator to get samples
         val_iterator = iter(val_loader)
         
+        print("Collecting samples for visualization...")
+        
         # Collect enough samples
         hsi_samples = []
         octa_samples = []
@@ -109,9 +118,14 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
         
         # Collect requested number of samples, potentially from multiple batches
         samples_needed = num_samples
+        batch_count = 0
+        
         while samples_needed > 0:
             try:
                 hsi_batch, octa_batch, patient_ids = next(val_iterator)
+                batch_count += 1
+                
+                print(f"  Batch {batch_count}: {len(hsi_batch)} samples, patient IDs: {patient_ids}")
                 
                 # Take as many samples as needed from this batch
                 samples_to_take = min(samples_needed, len(hsi_batch))
@@ -120,14 +134,22 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
                 octa_samples.append(octa_batch[:samples_to_take])
                 patient_id_samples.extend(patient_ids[:samples_to_take])
                 
-                samples_needed -= samples_to_take
+                print(f"  - Added {samples_to_take} samples, total now: {len(patient_id_samples)}")
                 
+                samples_needed -= samples_to_take
+                print(f"  - Still need {samples_needed} more samples")
+                
+                if samples_needed <= 0:
+                    print(f"  - Collected all {num_samples} requested samples")
+                    break
+                    
             except StopIteration:
                 # If we run out of batches, restart the iterator
+                print(f"  - Reached end of validation dataset after {batch_count} batches")
                 val_iterator = iter(val_loader)
                 # If we couldn't get enough samples, just use what we have
                 if samples_needed > 0:
-                    print(f"Warning: Could only collect {num_samples - samples_needed} samples for visualization instead of {num_samples}")
+                    print(f"WARNING: Could only collect {num_samples - samples_needed} samples for visualization instead of {num_samples}")
                 break
         
         # Concatenate all collected samples
@@ -137,11 +159,13 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             
             # Make sure we have the right number of samples
             num_samples = len(hsi_batch)
+            print(f"Final number of samples for visualization: {num_samples}")
+            print(f"Patient IDs to visualize: {patient_id_samples}")
             
             # Create a figure with multiple rows for each sample
             plt.figure(figsize=(15, 5 * num_samples))
         else:
-            print("Error: No samples could be collected for visualization")
+            print("ERROR: No samples could be collected for visualization")
             return
 
         for i in range(num_samples):
@@ -238,6 +262,7 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
                 f.write(f"Epoch {epoch}: Saved visualization to {vis_path}\n")
         
         print(f"Saved visualization for epoch {epoch} to {vis_path}")
+        print(f"==== End Visualization Debug ====\n")
 
 
 def save_loss_plots(metrics_history, output_dir, log_dir=None):
