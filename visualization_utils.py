@@ -161,18 +161,26 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             num_samples = len(hsi_batch)
             print(f"Final number of samples for visualization: {num_samples}")
             print(f"Patient IDs to visualize: {patient_id_samples}")
-            
-            # Create a figure with multiple rows for each sample
-            plt.figure(figsize=(15, 5 * num_samples))
         else:
             print("ERROR: No samples could be collected for visualization")
             return
+
+        # Create a patient-specific output directory
+        patient_vis_dir = output_dir / f"epoch_{epoch}"
+        patient_vis_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Created patient-specific visualization directory: {patient_vis_dir}")
+
+        # List to track all visualization paths
+        all_vis_paths = []
 
         for i in range(num_samples):
             # Get a single sample - process one at a time to save memory
             hsi = hsi_batch[i:i+1].to(device, non_blocking=True)
             octa = octa_batch[i:i+1].to(device, non_blocking=True)
             patient_id = patient_id_samples[i]
+
+            # Clean the patient ID to make it safe for filenames
+            safe_patient_id = patient_id.replace('/', '_').replace('\\', '_')
 
             # Generate fake OCTA image
             fake_octa = generator(hsi)
@@ -211,37 +219,60 @@ def save_sample_visualizations(generator, val_loader, device, epoch, output_dir,
             # Transpose to HWC for plotting
             rgb_hsi = np.transpose(rgb_hsi, (1, 2, 0))
             
-            # Create subplots for this sample
-            plt.subplot(num_samples, 3, i*3 + 1)
+            # Create a new figure for this patient
+            plt.figure(figsize=(15, 5))
+            
+            # Plot HSI input
+            plt.subplot(1, 3, 1)
             plt.imshow(rgb_hsi)
             plt.title(f"HSI Input (RGB-like)\n{patient_id}")
             plt.axis('off')
-            # Don't delete rgb_hsi yet since matplotlib needs it for rendering
             
-            plt.subplot(num_samples, 3, i*3 + 2)
+            # Plot generated OCTA
+            plt.subplot(1, 3, 2)
             plt.imshow(fake_octa_np, cmap='gray')
             plt.title(f"Generated OCTA")
             plt.axis('off')
-            # Keep fake_octa_np for rendering
             
-            plt.subplot(num_samples, 3, i*3 + 3)
+            # Plot real OCTA
+            plt.subplot(1, 3, 3)
             plt.imshow(octa_np, cmap='gray')
             plt.title(f"Real OCTA")
             plt.axis('off')
-            # Keep octa_np for rendering
             
-            # After the plots for this sample are set up, we can clear any CUDA cache
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # Save this patient's visualization
+            plt.tight_layout()
+            patient_vis_path = patient_vis_dir / f'sample_{safe_patient_id}.png'
+            plt.savefig(patient_vis_path, bbox_inches='tight', dpi=100)
+            plt.close()
             
-            # Clear unneeded memory
+            print(f"Saved visualization for patient {patient_id} to {patient_vis_path}")
+            all_vis_paths.append(patient_vis_path)
+            
+            # After saving, we can clear memory
+            del rgb_hsi, fake_octa_np, octa_np
+            
+            # Clear CUDA cache
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
-        # Save the combined visualization with lower DPI to save memory
+        # Also create the combined visualization
+        plt.figure(figsize=(15, 5 * num_samples))
+        
+        for i in range(num_samples):
+            # Load the individual patient images we just saved
+            patient_img = plt.imread(str(all_vis_paths[i]))
+            
+            # Add it to the combined figure
+            plt.subplot(num_samples, 1, i+1)
+            plt.imshow(patient_img)
+            plt.axis('off')
+            plt.title(f"Patient: {patient_id_samples[i]}")
+        
+        # Save the combined visualization
         plt.tight_layout()
         vis_path = output_dir / f'epoch_{epoch}_samples.png'
-        plt.savefig(vis_path, bbox_inches='tight', dpi=100)  # Lower DPI
+        plt.savefig(vis_path, bbox_inches='tight', dpi=100)
         plt.close('all')  # Close all figures to free memory
         
         # Clean up remaining arrays to fully free memory
