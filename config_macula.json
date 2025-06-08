@@ -100,7 +100,8 @@
     "hardware": {
         "num_workers": 4,
         "pin_memory": true,
-        "cuda_device": 0
+        "cuda_device": 0,
+        "empty_cache_freq": 10
     },
 
     "// Early Stopping": null,
@@ -118,10 +119,18 @@
         "adversarial_enabled": true
     },
 
+    "// Memory Optimization": null,
+    "memory_optimization": {
+        "enabled": true,
+        "use_amp": true,
+        "empty_cache_after_validation": true,
+        "empty_cache_after_checkpoint": true
+    },
+
     "// Resource Estimates": null,
     "resource_estimates": {
         "cpu_ram": "~4-6 GB",
-        "gpu_vram": "~4-5 GB (GTX 1080 or better recommended)",
+        "gpu_vram": "~2-3 GB (with mixed precision enabled)",
         "training_time": "~10-12 hours for 150 epochs on modern GPU"
     }
 }

@@ -2,6 +2,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 import torch
 import torch.nn as nn
+import torch.cuda.amp as amp  # Add automatic mixed precision support
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from pathlib import Path
@@ -45,6 +46,17 @@ class Trainer:
 
         # Set option for circle cropping
         self.use_circle_crop = use_circle_crop
+
+        # Set up mixed precision training if available and enabled in config
+        self.use_mixed_precision = self.config.get('memory_optimization', {}).get('use_amp', False)
+        self.scaler = None
+        if self.use_mixed_precision and torch.cuda.is_available():
+            self.scaler = amp.GradScaler()
+            print("✅ Mixed precision training enabled (reduces memory usage by ~50%)")
+        else:
+            if self.use_mixed_precision:
+                print("⚠️ Mixed precision requested but not available - using full precision")
+            self.use_mixed_precision = False
 
         # Initialize dictionary to track losses for epoch averaging
         self.epoch_losses = {
@@ -513,7 +525,9 @@ class Trainer:
         self.discriminator.train()
         
         # Use empty_cache at the start of each epoch to clear leftover memory
+        # This helps prevent memory fragmentation
         if torch.cuda.is_available():
+            print(f"GPU memory before cache clearing: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
             torch.cuda.empty_cache()
 
         # Initialize loss tracking for this epoch - only track what's needed
@@ -546,83 +560,165 @@ class Trainer:
                 self.optimizer_D.zero_grad(set_to_none=True)  # More memory efficient
 
                 # Pre-allocate labels only once and reuse
+                # This avoids repeatedly allocating new tensors
                 if not hasattr(self, 'real_label') or self.real_label.size(0) != batch_size:
                     self.real_label = torch.ones(batch_size, 1, 30, 30, device=self.device)
                     self.fake_label = torch.zeros(batch_size, 1, 30, 30, device=self.device)
 
-                # Generate fake image (no mixed precision)
-                fake_octa = self.generator(hsi)
+                # Generate fake image (with mixed precision if enabled)
+                if self.use_mixed_precision:
+                    with amp.autocast():
+                        fake_octa = self.generator(hsi)
+                        
+                        # Real loss
+                        real_output = self.discriminator(octa)
+                        d_real_loss = self.criterion_gan(real_output, self.real_label)
+                        
+                        # Fake loss
+                        fake_output = self.discriminator(fake_octa.detach())  # detach to avoid gradient flow
+                        d_fake_loss = self.criterion_gan(fake_output, self.fake_label)
+                        
+                        # Combined D loss
+                        d_loss = (d_real_loss + d_fake_loss) * 0.5
 
-                # Real loss
-                real_output = self.discriminator(octa)
-                d_real_loss = self.criterion_gan(real_output, self.real_label)
-
-                # Fake loss
-                fake_output = self.discriminator(fake_octa.detach())  # detach to avoid gradient flow
-                d_fake_loss = self.criterion_gan(fake_output, self.fake_label)
-
-                # Combined D loss
-                d_loss = (d_real_loss + d_fake_loss) * 0.5
-
-                d_loss.backward()
-                
-                # Apply gradient clipping to prevent exploding gradients
-                torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=self.config['gradient_clip'])
-                
-                self.optimizer_D.step()
+                    # Scale the gradients for mixed precision training
+                    self.scaler.scale(d_loss).backward()
+                    
+                    # Apply gradient clipping to prevent exploding gradients
+                    self.scaler.unscale_(self.optimizer_D)
+                    torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=self.config['gradient_clip'])
+                    
+                    # Update weights with scaled gradients
+                    self.scaler.step(self.optimizer_D)
+                    self.scaler.update()
+                else:
+                    # Standard precision training (original implementation)
+                    fake_octa = self.generator(hsi)
+                    
+                    # Real loss
+                    real_output = self.discriminator(octa)
+                    d_real_loss = self.criterion_gan(real_output, self.real_label)
+                    
+                    # Fake loss
+                    fake_output = self.discriminator(fake_octa.detach())  # detach to avoid gradient flow
+                    d_fake_loss = self.criterion_gan(fake_output, self.fake_label)
+                    
+                    # Combined D loss
+                    d_loss = (d_real_loss + d_fake_loss) * 0.5
+                    
+                    d_loss.backward()
+                    
+                    # Apply gradient clipping to prevent exploding gradients
+                    torch.nn.utils.clip_grad_norm_(self.discriminator.parameters(), max_norm=self.config['gradient_clip'])
+                    
+                    self.optimizer_D.step()
                 
                 # Free memory
                 del real_output, fake_output, d_real_loss, d_fake_loss
             else:
                 # Skip discriminator training if adversarial loss is disabled
                 d_loss = torch.tensor(0.0, device=self.device)
-                # Still need to generate fake OCTA for the generator training (no mixed precision)
-                fake_octa = self.generator(hsi)
+                # Still need to generate fake OCTA for the generator training
+                if self.use_mixed_precision:
+                    with amp.autocast():
+                        fake_octa = self.generator(hsi)
+                else:
+                    fake_octa = self.generator(hsi)
 
             # Train generator
             self.optimizer_G.zero_grad(set_to_none=True)  # More memory efficient
 
-            # No mixed precision
-            fake_output = self.discriminator(fake_octa)
-
-            # Calculate individual loss components only if enabled (memory efficient)
-            if self.loss_components['adversarial_enabled']:
-                g_gan_loss = self.criterion_gan(fake_output, self.real_label)
-                g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+            # Apply mixed precision for generator training if enabled
+            if self.use_mixed_precision:
+                with amp.autocast():
+                    # Compute fake discriminator output
+                    fake_output = self.discriminator(fake_octa)
+                    
+                    # Calculate individual loss components only if enabled
+                    if self.loss_components['adversarial_enabled']:
+                        g_gan_loss = self.criterion_gan(fake_output, self.real_label)
+                        g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+                    else:
+                        g_gan_loss = g_gan_loss_weighted = torch.tensor(0.0, device=self.device)
+                    
+                    if self.loss_components['pixel_enabled']:
+                        g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+                        g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
+                    else:
+                        g_pixel_loss_unweighted = g_pixel_loss = torch.tensor(0.0, device=self.device)
+                    
+                    if self.loss_components['perceptual_enabled']:
+                        g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+                        g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
+                    else:
+                        g_perceptual_loss_unweighted = g_perceptual_loss = torch.tensor(0.0, device=self.device)
+                    
+                    if self.loss_components['ssim_enabled']:
+                        g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+                        g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
+                    else:
+                        g_ssim_loss_unweighted = g_ssim_loss = torch.tensor(0.0, device=self.device)
+                    
+                    # Combined G loss
+                    g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
+                
+                # Scale gradients for numerical stability with FP16
+                self.scaler.scale(g_loss).backward()
+                
+                # Unscale for gradient clipping
+                self.scaler.unscale_(self.optimizer_G)
+                torch.nn.utils.clip_grad_norm_(self.generator.parameters(), max_norm=self.config['gradient_clip'])
+                
+                # Update with scaled gradients
+                self.scaler.step(self.optimizer_G)
+                self.scaler.update()
             else:
-                g_gan_loss = g_gan_loss_weighted = torch.tensor(0.0, device=self.device)
-
-            if self.loss_components['pixel_enabled']:
-                g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
-                g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
-            else:
-                g_pixel_loss_unweighted = g_pixel_loss = torch.tensor(0.0, device=self.device)
-
-            if self.loss_components['perceptual_enabled']:
-                g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
-                g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
-            else:
-                g_perceptual_loss_unweighted = g_perceptual_loss = torch.tensor(0.0, device=self.device)
-
-            if self.loss_components['ssim_enabled']:
-                g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
-                g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
-            else:
-                g_ssim_loss_unweighted = g_ssim_loss = torch.tensor(0.0, device=self.device)
-
-            # Combined G loss
-            g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
-
-            g_loss.backward()
-            
-            # Apply gradient clipping
-            torch.nn.utils.clip_grad_norm_(self.generator.parameters(), max_norm=self.config['gradient_clip'])
-            
-            self.optimizer_G.step()
+                # Standard precision (original implementation)
+                fake_output = self.discriminator(fake_octa)
+                
+                # Calculate individual loss components only if enabled (memory efficient)
+                if self.loss_components['adversarial_enabled']:
+                    g_gan_loss = self.criterion_gan(fake_output, self.real_label)
+                    g_gan_loss_weighted = g_gan_loss * self.config['lambda_adv']
+                else:
+                    g_gan_loss = g_gan_loss_weighted = torch.tensor(0.0, device=self.device)
+                
+                if self.loss_components['pixel_enabled']:
+                    g_pixel_loss_unweighted = self.criterion_pixel(fake_octa, octa)
+                    g_pixel_loss = g_pixel_loss_unweighted * self.config['lambda_pixel']
+                else:
+                    g_pixel_loss_unweighted = g_pixel_loss = torch.tensor(0.0, device=self.device)
+                
+                if self.loss_components['perceptual_enabled']:
+                    g_perceptual_loss_unweighted = self.criterion_perceptual(fake_octa, octa)
+                    g_perceptual_loss = g_perceptual_loss_unweighted * self.config['lambda_perceptual']
+                else:
+                    g_perceptual_loss_unweighted = g_perceptual_loss = torch.tensor(0.0, device=self.device)
+                
+                if self.loss_components['ssim_enabled']:
+                    g_ssim_loss_unweighted = self.criterion_ssim(fake_octa, octa)
+                    g_ssim_loss = g_ssim_loss_unweighted * self.config['lambda_ssim']
+                else:
+                    g_ssim_loss_unweighted = g_ssim_loss = torch.tensor(0.0, device=self.device)
+                
+                # Combined G loss
+                g_loss = g_gan_loss_weighted + g_pixel_loss + g_perceptual_loss + g_ssim_loss
+                
+                g_loss.backward()
+                
+                # Apply gradient clipping
+                torch.nn.utils.clip_grad_norm_(self.generator.parameters(), max_norm=self.config['gradient_clip'])
+                
+                self.optimizer_G.step()
             
             # Explicitly free memory
             if not self.loss_components['adversarial_enabled']:
                 del fake_output
+                
+            # Empty CUDA cache periodically if configured
+            empty_cache_freq = self.config.get('hardware', {}).get('empty_cache_freq', 0)
+            if empty_cache_freq > 0 and (i + 1) % empty_cache_freq == 0 and torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             # Update statistics
             total_g_loss += g_loss.item()
@@ -656,6 +752,10 @@ class Trainer:
                     'G_loss': g_loss.item(),
                     'D_loss': d_loss.item()
                 })
+                
+        # Clear CUDA cache at the end of each epoch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         # Calculate average losses for the epoch
         avg_g_loss = total_g_loss / len(self.train_loader)
@@ -739,6 +839,11 @@ class Trainer:
         """Run validation with memory optimizations."""
         self.generator.eval()
         self.discriminator.eval()
+        
+        # Clear CUDA cache before validation
+        if torch.cuda.is_available() and self.config.get('memory_optimization', {}).get('empty_cache_after_checkpoint', False):
+            print(f"GPU memory before validation cache clearing: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+            torch.cuda.empty_cache()
 
         total_val_loss = 0
         total_val_pixel_loss = 0
@@ -749,17 +854,26 @@ class Trainer:
         # Standard precision (no mixed precision) like in mini test
         with torch.no_grad():
             for hsi, octa, _ in self.val_loader:
-                # Move to device just-in-time to reduce GPU memory usage
+                # Move to device just-in-time to reduce GPU memory usage with non-blocking transfer
                 hsi = hsi.to(self.device, non_blocking=True)  # Non-blocking transfer
                 octa = octa.to(self.device, non_blocking=True)
 
                 # Generate fake OCTA images
-                fake_octa = self.generator(hsi)
-
-                # Compute validation losses for each component
-                val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
-                val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
-                val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
+                if self.use_mixed_precision:
+                    with amp.autocast():
+                        fake_octa = self.generator(hsi)
+                        
+                        # Calculate individual validation losses
+                        val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
+                        val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
+                        val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
+                else:
+                    fake_octa = self.generator(hsi)
+                    
+                    # Standard precision validation
+                    val_pixel_loss = self.criterion_pixel(fake_octa, octa) if self.loss_components['pixel_enabled'] else 0
+                    val_ssim_loss = self.criterion_ssim(fake_octa, octa) if self.loss_components['ssim_enabled'] else 0
+                    val_perceptual_loss = self.criterion_perceptual(fake_octa, octa) if self.loss_components['perceptual_enabled'] else 0
                 
                 # Compute GAN loss if needed
                 val_gan_loss = 0
@@ -794,6 +908,10 @@ class Trainer:
                 # Manually trigger garbage collection if needed
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()  # Clear unused memory
+                    
+        # Empty cache after validation if configured
+        if torch.cuda.is_available() and self.config.get('memory_optimization', {}).get('empty_cache_after_validation', False):
+            torch.cuda.empty_cache()
 
             # Calculate average losses
             avg_val_loss = total_val_loss / len(self.val_loader)

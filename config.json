@@ -116,5 +116,21 @@
         "perceptual_enabled": false,
         "ssim_enabled": true,
         "adversarial_enabled": true
+    },
+    
+    "// Hardware Settings": null,
+    "hardware": {
+        "num_workers": 4,
+        "pin_memory": true,
+        "cuda_device": 0,
+        "empty_cache_freq": 10
+    },
+
+    "// Memory Optimization": null,
+    "memory_optimization": {
+        "enabled": true,
+        "use_amp": true,
+        "empty_cache_after_validation": true,
+        "empty_cache_after_checkpoint": true
     }
 }
