@@ -267,7 +267,7 @@ class Trainer:
         with open(self.log_dir / 'experiment_info.txt', 'w') as f:
             f.write(f"Experiment ID: {self.exp_id}\n")
             f.write(f"Config file: {config_path}\n")
-            f.write(f"Circle crop: {use_circle_crop}\n")
+            f.write(f"Circle crop: {self.use_circle_crop}\n")
             f.write(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"Device: {self.device}\n\n")
             f.write("Configuration:\n")
@@ -1385,17 +1385,17 @@ if __name__ == '__main__':
 
     # Override loss weights if specified
     if args.loss_weights:
-            trainer.config['lambda_pixel'] = args.loss_weights[0]
-            trainer.config['lambda_perceptual'] = args.loss_weights[1]
-            trainer.config['lambda_ssim'] = args.loss_weights[2]
-            trainer.config['lambda_adv'] = args.loss_weights[3]
-            print(f"\nOverriding loss weights with custom values:")
-            print(f"Pixel loss (L1): {trainer.config['lambda_pixel']}")
-            print(f"Perceptual loss: {trainer.config['lambda_perceptual']}")
-            print(f"SSIM loss: {trainer.config['lambda_ssim']}")
-            print(f"Adversarial loss: {trainer.config['lambda_adv']}")
+        trainer.config['lambda_pixel'] = args.loss_weights[0]
+        trainer.config['lambda_perceptual'] = args.loss_weights[1]
+        trainer.config['lambda_ssim'] = args.loss_weights[2]
+        trainer.config['lambda_adv'] = args.loss_weights[3]
+        print(f"\nOverriding loss weights with custom values:")
+        print(f"Pixel loss (L1): {trainer.config['lambda_pixel']}")
+        print(f"Perceptual loss: {trainer.config['lambda_perceptual']}")
+        print(f"SSIM loss: {trainer.config['lambda_ssim']}")
+        print(f"Adversarial loss: {trainer.config['lambda_adv']}")
 
-        # Check for resume in command line args (priority) or config
+    # Check for resume in command line args (priority) or config
     resume_path = args.resume
     if not resume_path:
         # Check if resume is specified in config
@@ -1405,6 +1405,7 @@ if __name__ == '__main__':
         if not (resume_enabled and resume_path):
             resume_path = None
 
+    try:
         # Resume training if a checkpoint path is available
         if resume_path:
             print(f"Resuming training from checkpoint: {resume_path}")
@@ -1578,9 +1579,9 @@ if __name__ == '__main__':
             # Check if the checkpoint was trained with circle cropping
             if 'circle_crop' in checkpoint:
                 saved_crop = checkpoint['circle_crop']
-                if saved_crop != use_circle_crop:
+                if saved_crop != trainer.use_circle_crop:
                     print(f"WARNING: Checkpoint was trained with circle_crop={saved_crop}, "
-                          f"but current setting is circle_crop={use_circle_crop}")
+                          f"but current setting is circle_crop={trainer.use_circle_crop}")
 
             start_epoch = checkpoint['epoch'] + 1
             print(f"Starting training from epoch {start_epoch}/{trainer.config['num_epochs']}")
