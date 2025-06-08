@@ -39,12 +39,12 @@ class PathEncoder(json.JSONEncoder):
 
 
 class Trainer:
-    def __init__(self, config_path: str, exp_id: str = None, use_circle_crop: bool = True):
+    def __init__(self, config_path: str, exp_id: str = None):
         # Load and validate configuration
         self.config = load_config(config_path)
 
-        # Set option for circle cropping
-        self.use_circle_crop = use_circle_crop
+        # Get circle cropping setting from config
+        self.use_circle_crop = self.config.get('preprocessing', {}).get('circle_crop', False)
 
         # Set up mixed precision training if available and enabled in config
         self.use_mixed_precision = self.config.get('memory_optimization', {}).get('use_amp', False)
@@ -116,11 +116,11 @@ class Trainer:
                 if weight_name in self.config:
                     print(f"    Weight: {self.config[weight_name]}")
 
-        # Update config with circle crop option
+        # Ensure preprocessing config exists and has default values if not set
         if 'preprocessing' not in self.config:
             self.config['preprocessing'] = {}
-        self.config['preprocessing']['circle_crop'] = use_circle_crop
-        self.config['preprocessing']['crop_padding'] = 10  # Default padding
+        if 'crop_padding' not in self.config['preprocessing']:
+            self.config['preprocessing']['crop_padding'] = 10  # Default padding
 
         # Get model size for including in experiment ID
         model_size = self.config['model'].get('size', 'medium')
@@ -1375,23 +1375,14 @@ if __name__ == '__main__':
                         help='Path to checkpoint for resuming training')
     parser.add_argument('--exp_id', type=str, default=None,
                         help='Experiment ID (will default to timestamp if not provided)')
-    parser.add_argument('--circle_crop', action='store_true', default=True,
-                        help='Enable circle detection and cropping')
-    parser.add_argument('--no_circle_crop', action='store_true',
-                        help='Disable circle detection and cropping')
     parser.add_argument('--loss_weights', nargs=4, type=float,
                         help='Override loss weights in format: pixel perceptual ssim adv')
 
     args = parser.parse_args()
 
-    # Determine circle crop option (default is True, but can be disabled with --no_circle_crop)
-    use_circle_crop = True
-    if args.no_circle_crop:
-        use_circle_crop = False
-
     try:
         # Create trainer instance
-        trainer = Trainer(config_path=args.config, exp_id=args.exp_id, use_circle_crop=use_circle_crop)
+        trainer = Trainer(config_path=args.config, exp_id=args.exp_id)
 
         # Override loss weights if specified
         if args.loss_weights:
