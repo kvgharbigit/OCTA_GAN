@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="mixed precision + memory clearance">
-      <change beforePath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_macula.json" beforeDir="false" afterPath="$PROJECT_DIR$/config_macula.json" afterDir="false" />
-    </list>
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="mixed precision + memory clearance" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -101,15 +97,7 @@
       <workItem from="1748339560460" duration="2186000" />
       <workItem from="1748714825739" duration="166000" />
       <workItem from="1749350536412" duration="11709000" />
-      <workItem from="1749989228779" duration="791000" />
-    </task>
-    <task id="LOCAL-00013" summary="ReduceLRonPlateau">
-      <option name="closed" value="true" />
-      <created>1741579650550</created>
-      <option name="number" value="00013" />
-      <option name="presentableId" value="LOCAL-00013" />
-      <option name="project" value="LOCAL" />
-      <updated>1741579650550</updated>
+      <workItem from="1749989228779" duration="1399000" />
     </task>
     <task id="LOCAL-00014" summary="working moddle prior to toggle loss implementaiton">
       <option name="closed" value="true" />
@@ -495,7 +483,15 @@
       <option name="project" value="LOCAL" />
       <updated>1749381141372</updated>
     </task>
-    <option name="localTasksCounter" value="62" />
+    <task id="LOCAL-00062" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749990034487</created>
+      <option name="number" value="00062" />
+      <option name="presentableId" value="LOCAL-00062" />
+      <option name="project" value="LOCAL" />
+      <updated>1749990034487</updated>
+    </task>
+    <option name="localTasksCounter" value="63" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

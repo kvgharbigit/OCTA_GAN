@@ -69,14 +69,14 @@
     "// Model Architecture": null,
     "model": {
         "spectral_channels": 31,
-        "size": "small",
+        "size": "medium",
         "generator": {
-            "initial_filters": 16,
-            "max_filters": 64
-        },
-        "discriminator": {
             "initial_filters": 32,
             "max_filters": 128
+        },
+        "discriminator": {
+            "initial_filters": 64,
+            "max_filters": 256
         }
     },
 
@@ -130,8 +130,8 @@
 
     "// Resource Estimates": null,
     "resource_estimates": {
-        "cpu_ram": "~4-6 GB",
-        "gpu_vram": "~2-3 GB (with mixed precision enabled)",
-        "training_time": "~10-12 hours for 150 epochs on modern GPU"
+        "cpu_ram": "~8-10 GB",
+        "gpu_vram": "~4-5 GB (with mixed precision enabled)",
+        "training_time": "~16-20 hours for 150 epochs on modern GPU"
     }
 }
