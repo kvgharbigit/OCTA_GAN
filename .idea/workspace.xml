@@ -4,9 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="bug fix for validation loss plotting spacing">
+    <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="mixed precision + memory clearance">
+      <change beforePath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/OCTA_GAN.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/approved_patients/approved_participants_macula.csv" beforeDir="false" afterPath="$PROJECT_DIR$/approved_patients/approved_participants_macula.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config_macula.json" beforeDir="false" afterPath="$PROJECT_DIR$/config_macula.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,22 +45,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "C:/Users/kvgha/AI_Projects/OCTA_GAN",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "terminal",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\kvgha\AI_Projects\OCTA_GAN" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\kvgha\AI_Projects\OCTA_GAN\approved_patients" />
       <recent name="$PROJECT_DIR$" />
@@ -95,103 +100,8 @@
       <workItem from="1748241222729" duration="38000" />
       <workItem from="1748339560460" duration="2186000" />
       <workItem from="1748714825739" duration="166000" />
-      <workItem from="1749350536412" duration="677000" />
-    </task>
-    <task id="LOCAL-00001" summary="test">
-      <option name="closed" value="true" />
-      <created>1740177698083</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
-      <option name="project" value="LOCAL" />
-      <updated>1740177698083</updated>
-    </task>
-    <task id="LOCAL-00002" summary="test">
-      <option name="closed" value="true" />
-      <created>1740190216173</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1740190216173</updated>
-    </task>
-    <task id="LOCAL-00003" summary="test">
-      <option name="closed" value="true" />
-      <created>1740216360196</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1740216360196</updated>
-    </task>
-    <task id="LOCAL-00004" summary="test">
-      <option name="closed" value="true" />
-      <created>1740279351916</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1740279351916</updated>
-    </task>
-    <task id="LOCAL-00005" summary="test">
-      <option name="closed" value="true" />
-      <created>1740726591252</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1740726591252</updated>
-    </task>
-    <task id="LOCAL-00006" summary="working model pre-implementation of hsi cropping">
-      <option name="closed" value="true" />
-      <created>1740783638074</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
-      <option name="project" value="LOCAL" />
-      <updated>1740783638074</updated>
-    </task>
-    <task id="LOCAL-00007" summary="implemented hsi cropping to field of view">
-      <option name="closed" value="true" />
-      <created>1740786058665</created>
-      <option name="number" value="00007" />
-      <option name="presentableId" value="LOCAL-00007" />
-      <option name="project" value="LOCAL" />
-      <updated>1740786058665</updated>
-    </task>
-    <task id="LOCAL-00008" summary="implemented hsi cropping to field of view">
-      <option name="closed" value="true" />
-      <created>1740786301475</created>
-      <option name="number" value="00008" />
-      <option name="presentableId" value="LOCAL-00008" />
-      <option name="project" value="LOCAL" />
-      <updated>1740786301475</updated>
-    </task>
-    <task id="LOCAL-00009" summary="implemented dataloading hierarchical search">
-      <option name="closed" value="true" />
-      <created>1741180204534</created>
-      <option name="number" value="00009" />
-      <option name="presentableId" value="LOCAL-00009" />
-      <option name="project" value="LOCAL" />
-      <updated>1741180204534</updated>
-    </task>
-    <task id="LOCAL-00010" summary="commit dummy">
-      <option name="closed" value="true" />
-      <created>1741180602641</created>
-      <option name="number" value="00010" />
-      <option name="presentableId" value="LOCAL-00010" />
-      <option name="project" value="LOCAL" />
-      <updated>1741180602641</updated>
-    </task>
-    <task id="LOCAL-00011" summary="commit ready for testing with real data">
-      <option name="closed" value="true" />
-      <created>1741182144499</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
-      <option name="project" value="LOCAL" />
-      <updated>1741182144500</updated>
-    </task>
-    <task id="LOCAL-00012" summary="epoch logging, batch size, lr decay, early stopping">
-      <option name="closed" value="true" />
-      <created>1741504468032</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1741504468032</updated>
+      <workItem from="1749350536412" duration="11709000" />
+      <workItem from="1749989228779" duration="791000" />
     </task>
     <task id="LOCAL-00013" summary="ReduceLRonPlateau">
       <option name="closed" value="true" />
@@ -393,7 +303,199 @@
       <option name="project" value="LOCAL" />
       <updated>1748010916586</updated>
     </task>
-    <option name="localTasksCounter" value="38" />
+    <task id="LOCAL-00038" summary="macula dataset csv">
+      <option name="closed" value="true" />
+      <created>1749351300096</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1749351300096</updated>
+    </task>
+    <task id="LOCAL-00039" summary="macula dataset csv">
+      <option name="closed" value="true" />
+      <created>1749352541125</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1749352541125</updated>
+    </task>
+    <task id="LOCAL-00040" summary="macula dataset csv">
+      <option name="closed" value="true" />
+      <created>1749353065914</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1749353065914</updated>
+    </task>
+    <task id="LOCAL-00041" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749353762842</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1749353762842</updated>
+    </task>
+    <task id="LOCAL-00042" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749353988234</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1749353988234</updated>
+    </task>
+    <task id="LOCAL-00043" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749354419323</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1749354419323</updated>
+    </task>
+    <task id="LOCAL-00044" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749354990618</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1749354990618</updated>
+    </task>
+    <task id="LOCAL-00045" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749355161510</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1749355161510</updated>
+    </task>
+    <task id="LOCAL-00046" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749355190952</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1749355190962</updated>
+    </task>
+    <task id="LOCAL-00047" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749355661624</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1749355661624</updated>
+    </task>
+    <task id="LOCAL-00048" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749355754200</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1749355754200</updated>
+    </task>
+    <task id="LOCAL-00049" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749356515640</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
+      <option name="project" value="LOCAL" />
+      <updated>1749356515640</updated>
+    </task>
+    <task id="LOCAL-00050" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749356793601</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
+      <option name="project" value="LOCAL" />
+      <updated>1749356793601</updated>
+    </task>
+    <task id="LOCAL-00051" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749357025056</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1749357025056</updated>
+    </task>
+    <task id="LOCAL-00052" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749357512643</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
+      <option name="project" value="LOCAL" />
+      <updated>1749357512643</updated>
+    </task>
+    <task id="LOCAL-00053" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749377435521</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1749377435521</updated>
+    </task>
+    <task id="LOCAL-00054" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749377667804</created>
+      <option name="number" value="00054" />
+      <option name="presentableId" value="LOCAL-00054" />
+      <option name="project" value="LOCAL" />
+      <updated>1749377667804</updated>
+    </task>
+    <task id="LOCAL-00055" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749377766358</created>
+      <option name="number" value="00055" />
+      <option name="presentableId" value="LOCAL-00055" />
+      <option name="project" value="LOCAL" />
+      <updated>1749377766358</updated>
+    </task>
+    <task id="LOCAL-00056" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749377899899</created>
+      <option name="number" value="00056" />
+      <option name="presentableId" value="LOCAL-00056" />
+      <option name="project" value="LOCAL" />
+      <updated>1749377899899</updated>
+    </task>
+    <task id="LOCAL-00057" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749378043623</created>
+      <option name="number" value="00057" />
+      <option name="presentableId" value="LOCAL-00057" />
+      <option name="project" value="LOCAL" />
+      <updated>1749378043623</updated>
+    </task>
+    <task id="LOCAL-00058" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749378236867</created>
+      <option name="number" value="00058" />
+      <option name="presentableId" value="LOCAL-00058" />
+      <option name="project" value="LOCAL" />
+      <updated>1749378236867</updated>
+    </task>
+    <task id="LOCAL-00059" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749378659983</created>
+      <option name="number" value="00059" />
+      <option name="presentableId" value="LOCAL-00059" />
+      <option name="project" value="LOCAL" />
+      <updated>1749378659983</updated>
+    </task>
+    <task id="LOCAL-00060" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749379803489</created>
+      <option name="number" value="00060" />
+      <option name="presentableId" value="LOCAL-00060" />
+      <option name="project" value="LOCAL" />
+      <updated>1749379803489</updated>
+    </task>
+    <task id="LOCAL-00061" summary="mixed precision + memory clearance">
+      <option name="closed" value="true" />
+      <created>1749381141372</created>
+      <option name="number" value="00061" />
+      <option name="presentableId" value="LOCAL-00061" />
+      <option name="project" value="LOCAL" />
+      <updated>1749381141372</updated>
+    </task>
+    <option name="localTasksCounter" value="62" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -411,7 +513,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="test" />
     <MESSAGE value="working model pre-implementation of hsi cropping" />
     <MESSAGE value="implemented hsi cropping to field of view" />
     <MESSAGE value="implemented dataloading hierarchical search" />
@@ -435,6 +536,8 @@
     <MESSAGE value="MODULAR RESTRUCTURE - auugs" />
     <MESSAGE value="MODULAR RESTRUCTURE - augs" />
     <MESSAGE value="bug fix for validation loss plotting spacing" />
-    <option name="LAST_COMMIT_MESSAGE" value="bug fix for validation loss plotting spacing" />
+    <MESSAGE value="macula dataset csv" />
+    <MESSAGE value="mixed precision + memory clearance" />
+    <option name="LAST_COMMIT_MESSAGE" value="mixed precision + memory clearance" />
   </component>
 </project>
