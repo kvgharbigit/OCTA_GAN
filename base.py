@@ -962,6 +962,11 @@ class SSIMLoss(nn.Module):
         # Clone inputs to avoid in-place modifications
         x = x.clone()
         y = y.clone()
+        
+        # Convert from [-1,1] to [0,1] range for proper SSIM calculation
+        # This ensures SSIM works correctly regardless of the input normalization
+        x = (x + 1) / 2
+        y = (y + 1) / 2
 
         # Expand window to match input channels
         window = self.window.expand(x.size(1), 1, self.window_size, self.window_size)
@@ -982,6 +987,10 @@ class SSIMLoss(nn.Module):
         # Compute SSIM
         ssim_map = ((2 * mu_xy + self.C1) * (2 * sigma_xy + self.C2)) / \
                    ((mu_x_sq + mu_y_sq + self.C1) * (sigma_x_sq + sigma_y_sq + self.C2))
+        
+        # Clamp SSIM values to [0,1] range to ensure valid loss
+        # This prevents numerical instabilities resulting in values outside the expected range
+        ssim_map = torch.clamp(ssim_map, 0.0, 1.0)
 
         # Return loss (1 - SSIM) since we want to minimize
         return 1 - ssim_map.mean()
