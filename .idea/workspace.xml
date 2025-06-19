@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2b38b15c-3565-4c69-9ac0-782a0cf11f9a" name="Changes" comment="mixed precision + memory clearance">
-      <change beforePath="$PROJECT_DIR$/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config_macula.json" beforeDir="false" afterPath="$PROJECT_DIR$/config_macula.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -100,6 +100,7 @@
       <workItem from="1748714825739" duration="166000" />
       <workItem from="1749350536412" duration="11709000" />
       <workItem from="1749989228779" duration="1399000" />
+      <workItem from="1750291781884" duration="44000" />
     </task>
     <task id="LOCAL-00014" summary="working moddle prior to toggle loss implementaiton">
       <option name="closed" value="true" />
